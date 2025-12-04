@@ -384,6 +384,165 @@
   </style>
 </head>
 <body>
+<!-- ============================================================
+     OVERLAY DE LICENCIA · BLOQUEO INICIAL
+    
+=============================================================== -->
+
+<style>
+  #licenseOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 999999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  #licenseBox {
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 12px;
+    padding: 22px;
+    max-width: 720px;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: #e2e8f0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #licenseBox h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 16px;
+    text-align: center;
+  }
+  #licenseBox h3 {
+    margin: 10px 0 4px;
+    font-size: 13px;
+  }
+  #licenseBox ul {
+    margin: 4px 0 4px 18px;
+    padding: 0;
+  }
+  #licenseBox li {
+    margin: 2px 0;
+  }
+  #licenseButtons {
+    margin-top: 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .licenseBtn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #64748b;
+    background: #1e293b;
+    color: #f1f5f9;
+  }
+  .licenseBtn:hover {
+    background: #334155;
+  }
+  #licenseAccept {
+    background: #16a34a;
+    border-color: #22c55e !important;
+  }
+  #licenseAccept:hover {
+    background: #15803d;
+  }
+</style>
+
+<div id="licenseOverlay">
+  <div id="licenseBox">
+    <h2>Licencia de Uso / Usage License Agreement</h2>
+
+    <p>
+      <strong>Debes aceptar esta licencia para acceder y usar la simulación.</strong><br>
+      <em>You must accept this license to access and use the simulation.</em>
+    </p>
+
+    <p>
+      Copyright © 2025 Juan Carlos Amez Riendas.  
+      All rights reserved — Todos los derechos reservados.
+    </p>
+
+    <h3>Condiciones principales (ES)</h3>
+    <ul>
+      <li>Uso estrictamente educativo, personal y no comercial.</li>
+      <li>Prohibido copiar, descargar, modificar, redistribuir o integrar el código en otros proyectos sin autorización escrita.</li>
+      <li>Si la actividad educativa es de pago (alumnos, docentes, centros, empresas), se requiere contrato o licencia con el autor.</li>
+      <li>Prohibida la ingeniería inversa o extracción sistemática del código o de sus ideas.</li>
+      <li>La aceptación puede registrarse (fecha/hora, identificador técnico) conforme RGPD/LOPDGDD.</li>
+    </ul>
+
+    <h3>Main Terms (EN)</h3>
+    <ul>
+      <li>Strictly personal, educational and non-commercial use only.</li>
+      <li>Copying, downloading, modifying, redistributing or integrating the code into other projects is prohibited without written authorization.</li>
+      <li>Any paid educational use (students, teachers, institutions, companies) requires a separate license or contract with the author.</li>
+      <li>Reverse engineering or systematic extraction of the code or its ideas is prohibited.</li>
+      <li>Acceptance may be logged (date/time, technical identifier) under GDPR/LOPDGDD compliance.</li>
+    </ul>
+
+    <label style="margin-top: 10px; display:block; font-size:12px;">
+      <input type="checkbox" id="licenseCheck">
+      Acepto la licencia / I accept the license
+    </label>
+
+    <div id="licenseButtons">
+      <button class="licenseBtn" id="licenseReject">Cancelar / Cancel</button>
+      <button class="licenseBtn" id="licenseAccept">Aceptar / Accept</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const overlay   = document.getElementById("licenseOverlay");
+    const acceptBtn = document.getElementById("licenseAccept");
+    const rejectBtn = document.getElementById("licenseReject");
+    const checkbox  = document.getElementById("licenseCheck");
+
+    // Si ya aceptó en una visita anterior, no mostramos la capa
+    if (localStorage.getItem("ECC_LICENSE_ACCEPTED") === "yes") {
+      overlay.style.display = "none";
+      return;
+    }
+
+    acceptBtn.addEventListener("click", () => {
+      if (!checkbox.checked) {
+        alert("Debes aceptar la licencia / You must accept the license.");
+        return;
+      }
+
+      // Guardamos aceptación (solo un flag simple)
+      localStorage.setItem("ECC_LICENSE_ACCEPTED", "yes");
+
+      // Aquí podrías hacer un fetch a tu backend para registrar aceptación, si quieres.
+      // fetch("/log-ecc-license", { method:"POST", body: JSON.stringify({ ts: new Date().toISOString() }) });
+
+      overlay.style.display = "none";
+    });
+
+    rejectBtn.addEventListener("click", () => {
+      alert("No puedes acceder sin aceptar la licencia / Access denied.");
+      // Redirigimos o simplemente cerramos la pestaña
+      window.location.href = "https://www.google.com"; // o la URL que quieras
+    });
+  })();
+</script>
+
+
+
+
+
+  
   <div id="overlay">
     <h1 id="overlayTitle">Sistema inmune 3D (ECC + datasets clínicos / CSV)</h1>
     <div class="legend-item" id="legendCD4">
@@ -593,6 +752,23 @@
 
   <script type="module">
     import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    // ====== GATE DE LICENCIA: NO EJECUTAR SI NO HAN ACEPTADO ======
+    (function ensureEccLicenseAccepted() {
+      try {
+        const flag = localStorage.getItem("ECC_LICENSE_ACCEPTED");
+        if (flag !== "yes") {
+          alert(
+            "Para usar esta simulación debes aceptar la licencia legal en la capa inicial.\n\n" +
+            "To use this simulation you must accept the legal license in the initial overlay."
+          );
+          throw new Error("ECC license not accepted");
+        }
+      } catch (e) {
+        console.error(e);
+        throw e;
+      }
+    })();
+
 
     window.addEventListener("load", () => {
       /* =========================
@@ -3374,4 +3550,5 @@
   </script>
 </body>
 </html>
+
 
