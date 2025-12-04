@@ -1,1 +1,3376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sistema inmune 3D – ECC + microbioma realista</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000000;
+      color: #f9fafb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
 
+    button {
+      font-size: 11px;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 999px;
+      border: 1px solid #4b5563;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1f2937;
+      border-color: #9ca3af;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      background: rgba(10,10,15,0.94);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.4;
+      border: 1px solid rgba(148,163,184,0.6);
+      z-index: 10;
+      max-width: 360px;
+    }
+    #overlay h1 {
+      font-size: 13px;
+      margin: 0 0 4px 0;
+    }
+    #overlay .legend-item {
+      margin: 2px 0;
+    }
+    #overlay .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+    #overlay .stats {
+      margin-top: 6px;
+      border-top: 1px solid rgba(55,65,81,0.8);
+      padding-top: 4px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 3px 8px;
+    }
+    #overlay .stat-label {
+      color: #9ca3af;
+    }
+    #overlay .stat-value {
+      font-weight: 600;
+    }
+    #overlay .explain {
+      margin-top: 6px;
+      font-size: 10px;
+      color: #cbd5f5;
+    }
+
+    #hint {
+      position: fixed;
+      right: 8px;
+      bottom: 6px;
+      font-size: 11px;
+      color: #9ca3af;
+      background: rgba(10,10,15,0.94);
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(75,85,99,0.7);
+      z-index: 10;
+    }
+
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      display: none;
+      background: rgba(10,10,15,0.96);
+      color: #e5e7eb;
+      font-size: 11px;
+      border-radius: 8px;
+      padding: 6px 8px;
+      border: 1px solid rgba(148,163,184,0.6);
+      z-index: 20;
+      max-width: 260px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
+    #tooltip strong {
+      color: #e5e7eb;
+    }
+    #tooltip em {
+      color: #a5b4fc;
+      font-style: normal;
+    }
+
+    #logPanel {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      width: 330px;
+      height: 260px;
+      background: rgba(10,10,15,0.94);
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.6);
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+    #logTitle {
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(55,65,81,0.8);
+      font-weight: 600;
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+    #logContent {
+      flex: 1;
+      padding: 4px 8px;
+      overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: nowrap;
+    }
+    #logFoot {
+      padding: 4px 8px;
+      border-top: 1px solid rgba(55,65,81,0.8);
+      font-size: 9px;
+      color: #9ca3af;
+    }
+
+    /* Panel mezcla de patógenos */
+    #microPanel {
+      position: fixed;
+      top: 276px;
+      right: 8px;
+      width: 330px;
+      height: 260px;
+      background: rgba(10,10,15,0.94);
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.6);
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+    #microHeader {
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(55,65,81,0.8);
+      font-weight: 600;
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+    #microSubheader {
+      padding: 2px 8px;
+      font-size: 9px;
+      color: #9ca3af;
+      border-bottom: 1px solid rgba(31,41,55,0.9);
+    }
+    #microBody {
+      flex: 1;
+      padding: 4px 8px;
+      overflow-y: auto;
+    }
+    .micro-section-title {
+      margin: 3px 0 1px 0;
+      font-size: 9px;
+      color: #cbd5f5;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .micro-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+      gap: 2px 6px;
+      margin-bottom: 3px;
+      align-items: center;
+    }
+    .micro-pathogen-name {
+      font-weight: 600;
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .micro-pathogen-type {
+      font-size: 9px;
+      color: #9ca3af;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .micro-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .micro-controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
+      height: 4px;
+    }
+    .micro-controls input[type="number"] {
+      width: 46px;
+      font-size: 9px;
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      padding: 1px 2px;
+    }
+    #microFooter {
+      padding: 4px 8px;
+      border-top: 1px solid rgba(55,65,81,0.8);
+      font-size: 9px;
+      color: #9ca3af;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #microButtons {
+      display: flex;
+      gap: 4px;
+    }
+
+    #controls {
+      position: fixed;
+      left: 8px;
+      bottom: 8px;
+      width: 340px;
+      background: rgba(10,10,15,0.94);
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.6);
+      font-size: 10px;
+      padding: 6px 8px;
+      z-index: 10;
+    }
+    #controls h2 {
+      margin: 0 0 4px 0;
+      font-size: 11px;
+    }
+    #controls .control-row {
+      display: flex;
+      align-items: center;
+      margin: 2px 0;
+      gap: 4px;
+    }
+    #controls label {
+      flex: 0 0 145px;
+      color: #e5e7eb;
+    }
+    #controls input[type="range"],
+    #controls select {
+      flex: 1;
+      font-size: 10px;
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      padding: 1px 2px;
+    }
+    #diseaseInfo {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #cbd5f5;
+    }
+    #diseaseStage small {
+      color: #93c5fd;
+    }
+
+    #theoryPanel {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(780px, 96vw);
+      max-height: 70vh;
+      background: rgba(10,10,15,0.97);
+      border-radius: 14px;
+      border: 1px solid rgba(148,163,184,0.7);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #theoryHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(55,65,81,0.9);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    #theoryBody {
+      padding: 8px 12px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+    #theoryBody h3 {
+      margin: 6px 0 2px 0;
+      font-size: 11px;
+    }
+    #theoryBody p {
+      margin: 2px 0;
+    }
+    #theoryBody code {
+      font-size: 10px;
+      background: #020617;
+      padding: 1px 3px;
+      border-radius: 4px;
+    }
+    #closeTheory {
+      border-radius: 999px;
+      background: #1f2937;
+      color: #e5e7eb;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 7px;
+    }
+    #openTheory {
+      position: fixed;
+      top: 8px;
+      left: 380px;
+      z-index: 12;
+      border: 1px solid #4b5563;
+      border-radius: 999px;
+      background: rgba(10,10,15,0.9);
+      color: #e5e7eb;
+      font-size: 11px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+
+    #copyright {
+      position: fixed;
+      bottom: 4px;
+      right: 50%;
+      transform: translateX(50%);
+      font-size: 9px;
+      color: #6b7280;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(55,65,81,0.8);
+      z-index: 5;
+    }
+
+    #scenarioBanner {
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15,23,42,0.95);
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(129,140,248,0.9);
+      font-size: 12px;
+      color: #e5e7eb;
+      z-index: 40;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <h1 id="overlayTitle">Sistema inmune 3D (ECC + datasets clínicos / CSV)</h1>
+    <div class="legend-item" id="legendCD4">
+      <span class="dot" style="background:#00FF4F;"></span>
+      CD4⁺ T helper – FITC/Alexa488 (verde)
+    </div>
+    <div class="legend-item" id="legendCD8">
+      <span class="dot" style="background:#FF4500;"></span>
+      CD8⁺ T citotóxicos – TRITC/PE (rojo-naranja)
+    </div>
+    <div class="legend-item" id="legendB">
+      <span class="dot" style="background:#FF1493;"></span>
+      Linfocitos B – APC/Cy5 (magenta profundo)
+    </div>
+    <div class="legend-item" id="legendNK">
+      <span class="dot" style="background:#FF00FF;"></span>
+      NK – canal magenta con gránulos
+    </div>
+    <div class="legend-item" id="legendMAC">
+      <span class="dot" style="background:#FFB300;"></span>
+      Macrófagos – Cy3/Alexa555 (amarillo-naranja irregular)
+    </div>
+    <div class="legend-item" id="legendDC">
+      <span class="dot" style="background:#00E5FF;"></span>
+      Dendríticas – cian estrelladas
+    </div>
+    <div class="legend-item" id="legendGramPos">
+      <span class="dot" style="background:#C084FC;"></span>
+      Bacterias Gram+ – cocos/bacilos violetas
+    </div>
+    <div class="legend-item" id="legendGramNeg">
+      <span class="dot" style="background:#38BDF8;"></span>
+      Bacterias Gram– – bacilos cian
+    </div>
+    <div class="legend-item" id="legendVirusEnv">
+      <span class="dot" style="background:#FF80FF;"></span>
+      Virus envueltos – magenta/amarillo con espículas
+    </div>
+    <div class="legend-item" id="legendSelf">
+      <span class="dot" style="background:#FB923C;"></span>
+      Células de tejido (self)
+    </div>
+    <div class="stats">
+      <div>
+        <div class="stat-label" id="statKilledLabel">Patógenos destruidos</div>
+        <div class="stat-value" id="killedStat">0</div>
+      </div>
+      <div>
+        <div class="stat-label" id="statSelfLabel">Células dañadas</div>
+        <div class="stat-value" id="selfStat">0</div>
+      </div>
+      <div>
+        <div class="stat-label" id="statActiveLabel">Linfocitos activos</div>
+        <div class="stat-value" id="activeStat">0</div>
+      </div>
+      <div>
+        <div class="stat-label" id="statMicrobeLabel">Patógenos vivos</div>
+        <div class="stat-value" id="microbeStat">0</div>
+      </div>
+    </div>
+    <div class="explain" id="overlayExplain">
+      El volumen representa un <strong>tejido infectado</strong> con células inmunes,
+      patógenos y células propias. La mezcla de patógenos se ajusta a
+      <strong>estadísticas epidemiológicas</strong> de cada enfermedad.
+    </div>
+  </div>
+
+  <button id="openTheory">Teoría ECC / datasets / ¿qué estoy viendo?</button>
+
+  <div id="logPanel">
+    <div id="logTitle">ECC event log (últimas decisiones)</div>
+    <div id="logContent"></div>
+    <div id="logFoot">t | célula | objetivo | señal ≥ θ | resultado</div>
+  </div>
+
+  <!-- Panel mezcla de patógenos -->
+  <div id="microPanel">
+    <div id="microHeader">Mezcla de patógenos (escenario actual)</div>
+    <div id="microSubheader">
+      Ajusta el peso relativo de cada patógeno (se normaliza al reaplicar la mezcla).
+    </div>
+    <div id="microBody"></div>
+    <div id="microFooter">
+      <div id="microButtons">
+        <button id="microApplyBtn">Reaplicar mezcla</button>
+        <button id="microResetBtn">Reset</button>
+      </div>
+      <div id="microTotals">
+        Σ bacteria: <span id="microTotalBact">–</span> · Σ virus: <span id="microTotalVirus">–</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <h2 id="controlsTitle">Controles simulación</h2>
+
+    <div class="control-row">
+      <label id="lblLang" for="langSelect">Idioma / Language</label>
+      <select id="langSelect">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label id="lblDisease" for="diseaseSelect">Enfermedad</label>
+      <select id="diseaseSelect">
+        <option value="homeostasis">0 · Homeostasis (sano)</option>
+        <option value="flu">1 · Infección vírica aguda (gripe)</option>
+        <option value="covid">2 · Neumonía COVID-19 grave</option>
+        <option value="sepsis">3 · Sepsis bacteriana (Gram–/UCI)</option>
+        <option value="tb">4 · Tuberculosis pulmonar</option>
+        <option value="ecoli">5 · Enteritis por E. coli / GE bacteriana</option>
+        <option value="pneumo">6 · Neumonía neumocócica</option>
+        <option value="lupus">7 · Lupus eritematoso sistémico (LES)</option>
+        <option value="ms">8 · Esclerosis múltiple (EM)</option>
+        <option value="tumor">9 · Tumor sólido con escape inmune</option>
+        <option value="immunodef">10 · Inmunodeficiencia severa</option>
+      </select>
+    </div>
+    <div id="diseaseInfo">
+      <div id="diseaseInfoBase"></div>
+      <div id="diseaseStage"></div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #1f2937;margin:4px 0;">
+
+    <div class="control-row">
+      <label id="lblDataset" for="dataSourceSelect">Dataset clínico</label>
+      <select id="dataSourceSelect">
+        <option value="synthetic">Interno ECC (didáctico)</option>
+        <option value="fluNetDemo">OMS FluNet (gripe – carga vírica)</option>
+        <option value="localSepsis">Sepsis UCI/MIMIC (CSV local)</option>
+        <option value="customCsv">CSV personalizado (cualquier curva)</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <label id="lblCsvUpload" for="csvUpload">Subir CSV local</label>
+      <input type="file" id="csvUpload" accept=".csv" />
+    </div>
+    <div class="control-row" id="csvColumnRow" style="display:none;">
+      <label id="lblCsvColumn" for="csvColumnSelect">Columna CSV</label>
+      <select id="csvColumnSelect"></select>
+    </div>
+    <div id="datasetStatus" style="margin-top:2px;font-size:9px;color:#9ca3af;">
+      Usando curvas internas ECC (modelo didáctico sin conexión externa).
+    </div>
+
+    <hr style="border:none;border-top:1px solid #1f2937;margin:4px 0;">
+
+    <div class="control-row">
+      <label id="lblTemp" for="envTemp">Temperatura (°C)</label>
+      <input type="range" id="envTemp" min="35" max="41" step="0.1" value="37">
+    </div>
+    <div class="control-row">
+      <label id="lblAntibiotic" for="envAntibiotic">Antibiótico (nivel)</label>
+      <input type="range" id="envAntibiotic" min="0" max="1" step="0.05" value="0">
+    </div>
+    <div class="control-row">
+      <label id="lblSteroid" for="envSteroid">Inmunosupresión</label>
+      <input type="range" id="envSteroid" min="0" max="1" step="0.05" value="0">
+    </div>
+
+    <hr style="border:none;border-top:1px solid #1f2937;margin:4px 0;">
+
+    <div class="control-row">
+      <label id="lblBrightness" for="brightness">Brillo global</label>
+      <input type="range" id="brightness" min="0.3" max="2.0" step="0.1" value="1.3">
+    </div>
+    <div class="control-row">
+      <label id="lblBgDark" for="bgDark">Fondo más gris</label>
+      <input type="range" id="bgDark" min="0" max="1" step="0.05" value="0">
+    </div>
+    <div class="control-row">
+      <label id="lblFog" for="fogDensity">Niebla / contraste</label>
+      <input type="range" id="fogDensity" min="0" max="0.04" step="0.002" value="0.008">
+    </div>
+
+    <hr style="border:none;border-top:1px solid #1f2937;margin:4px 0;">
+
+    <div class="control-row">
+      <label id="lblZoom">Zoom (rueda ratón)</label>
+      <span id="lblZoomHint">acercar/alejar la escena</span>
+    </div>
+    <div class="control-row">
+      <label id="lblSim">Simulación</label>
+      <button id="toggleSimBtn" style="flex:1;">Pausar</button>
+    </div>
+  </div>
+
+  <div id="hint">Cámara auto-gira · Zoom con rueda · Ratón para inspeccionar · Cambia enfermedad y dataset · Barra espaciadora = Pausa/Reanudar</div>
+  <div id="tooltip"></div>
+
+  <div id="theoryPanel">
+    <div id="theoryHeader">
+      <span id="theoryHeaderTitle">Algoritmo ECC – Fibrado inmune + datasets clínicos + microbioma realista</span>
+      <button id="closeTheory">Cerrar</button>
+    </div>
+    <div id="theoryBody"></div>
+  </div>
+
+  <div id="scenarioBanner"></div>
+
+  <div id="copyright">
+    © 2026 Juan Carlos Amez Riendas. Todos los derechos reservados.
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+    window.addEventListener("load", () => {
+      /* =========================
+         I18N
+         ========================= */
+      let currentLang = "es";
+
+      const i18n = {
+        es: {
+          overlayTitle: "Sistema inmune 3D (ECC + datasets clínicos / CSV)",
+          legendCD4: "CD4⁺ T helper – FITC/Alexa488 (verde)",
+          legendCD8: "CD8⁺ T citotóxicos – TRITC/PE (rojo-naranja)",
+          legendB: "Linfocitos B – APC/Cy5 (magenta profundo)",
+          legendNK: "NK – canal magenta con gránulos",
+          legendMAC: "Macrófagos – Cy3/Alexa555 (amarillo-naranja irregular)",
+          legendDC: "Dendríticas – cian estrelladas",
+          legendGramPos: "Bacterias Gram+ – cocos/bacilos violetas",
+          legendGramNeg: "Bacterias Gram– – bacilos cian",
+          legendVirusEnv: "Virus envueltos – magenta/amarillo con espículas",
+          legendSelf: "Células de tejido (self)",
+
+          statKilledLabel: "Patógenos destruidos",
+          statSelfLabel: "Células dañadas",
+          statActiveLabel: "Linfocitos activos",
+          statMicrobeLabel: "Patógenos vivos",
+
+          overlayExplain:
+            "El volumen representa un <strong>tejido infectado</strong> con células inmunes, patógenos y células propias. " +
+            "La mezcla de patógenos se aproxima a la <strong>epidemiología real</strong> de cada enfermedad (CAP, sepsis, GE, etc.).",
+
+          logTitle: "ECC event log (últimas decisiones)",
+          logFoot: "t | célula | objetivo | señal ≥ θ | resultado",
+
+          controlsTitle: "Controles simulación",
+          lblLang: "Idioma / Language",
+          langEs: "Español",
+          langEn: "English",
+
+          lblDisease: "Enfermedad",
+          lblDataset: "Dataset clínico",
+          lblCsvUpload: "Subir CSV local",
+          lblCsvColumn: "Columna CSV",
+          lblTemp: "Temperatura (°C)",
+          lblAntibiotic: "Antibiótico (nivel)",
+          lblSteroid: "Inmunosupresión",
+          lblBrightness: "Brillo global",
+          lblBgDark: "Fondo más gris",
+          lblFog: "Niebla / contraste",
+          lblZoom: "Zoom (rueda ratón)",
+          lblZoomHint: "acercar/alejar la escena",
+          lblSim: "Simulación",
+
+          hint:
+            "Cámara auto-gira · Zoom con rueda · Ratón para inspeccionar · Cambia enfermedad/dataset · Barra espaciadora = Pausa/Reanudar",
+
+          theoryHeaderTitle: "Algoritmo ECC – Fibrado inmune + datasets + microbioma realista",
+          theoryBtnOpen: "Teoría ECC / datasets / ¿qué estoy viendo?",
+          theoryBtnClose: "Cerrar",
+
+          togglePause: "Pausar",
+          toggleResume: "Reanudar",
+
+          datasetStatusSynthetic:
+            "Usando curvas internas ECC (modelo didáctico sin conexión externa).",
+          datasetStatusFluLoading:
+            "Descargando demo OMS FluNet (puede fallar por CORS)…",
+          datasetStatusFluOk:
+            "Dataset OMS FluNet cargado y normalizado. Se usa como curva de carga/inflamación.",
+          datasetStatusFluFail:
+            "No se pudo cargar FluNet (CORS/red). Se usa modelo interno ECC.",
+          datasetStatusCsvMode:
+            "Modo CSV local: sube un fichero .csv (por ej. derivado de sepsis/MIMIC) para generar la curva 0–1.",
+          datasetStatusCsvError:
+            "Error al interpretar CSV. Se mantiene dataset anterior / modelo interno.",
+          datasetStatusCsvNoNum:
+            "No se encontró ninguna columna numérica en el CSV. No se modifica el modelo.",
+          datasetStatusCsvParsed: (file) =>
+            `CSV cargado (${file}). Elige la columna numérica a mapear como severidad 0–1.`,
+          datasetStatusCsvColApplied: (col) =>
+            `Usando columna "${col}" como curva de severidad 0–1 para ECC.`,
+
+          hintSeriesFrom: (src) =>
+            `Curva ECC actual derivada de: ${src}`,
+
+          diseaseNames: {
+            homeostasis: "Homeostasis (sano)",
+            flu: "Infección vírica aguda (gripe/CAP)",
+            covid: "Neumonía COVID-19 grave",
+            sepsis: "Sepsis bacteriana (Gram–/UCI)",
+            tb: "Tuberculosis pulmonar",
+            ecoli: "GE bacteriana (E. coli, Salmonella, Campylobacter…)",
+            pneumo: "Neumonía neumocócica",
+            lupus: "Lupus eritematoso sistémico (LES)",
+            ms: "Esclerosis múltiple (EM)",
+            tumor: "Tumor sólido con escape inmune",
+            immunodef: "Inmunodeficiencia severa",
+          },
+          diseasePhaseEarly: "Fase: inicio / incubación temprana",
+          diseasePhasePeak: "Fase: pico de actividad",
+          diseasePhaseLate: "Fase: resolución / crónica",
+
+          scenarioBanner: (label, ds) =>
+            `Escenario ECC: ${label}${ds ? " · dataset: " + ds : ""}`,
+
+          theoryHtml: `
+            <h3>1. ¿Qué estás viendo?</h3>
+            <p>
+              Cada vez que eliges una enfermedad, el sistema genera una
+              <strong>mezcla de patógenos</strong> inspirada en datos reales:
+              CAP con <em>Streptococcus pneumoniae</em>, sepsis con muchos
+              <em>E. coli</em>/<em>Klebsiella</em>, enteritis con
+              <em>Salmonella</em>, <em>Campylobacter</em>, etc.
+            </p>
+            <p>
+              Es un modelo conceptual: las proporciones están basadas en
+              estudios epidemiológicos publicados, pero simplificadas para
+              visualización 3D y docencia, no para diagnóstico clínico.
+            </p>
+
+            <h3>2. Cómo se conectan datos y visualización</h3>
+            <ul>
+              <li>
+                Un <strong>dataset temporal</strong> (FluNet, CSV clínico o
+                serie sintética) se normaliza a 0–1.
+              </li>
+              <li>
+                Esa curva alimenta la <em>carga patógena</em>, la
+                <em>inflamación</em> y el <em>sesgo autoinmune</em>
+                del modelo ECC.
+              </li>
+              <li>
+                Para cada enfermedad hay una tabla de <strong>patógenos
+                predominantes</strong> (p. ej. sepsis: E. coli, Klebsiella,
+                Pseudomonas, Acinetobacter, S. aureus…; GE: Salmonella,
+                Campylobacter, Shigella, E. coli, etc.).
+              </li>
+              <li>
+                El volumen se rellena con esos bichos, respetando
+                aproximadamente esas proporciones.
+              </li>
+            </ul>
+
+            <h3>3. ¿Qué NO es esto?</h3>
+            <p>
+              No es un simulador fisiológico validado, ni sustituye modelos
+              farmacocinéticos ni scores clínicos. Es una herramienta de
+              <strong>exploración y narrativa visual</strong> que permite:
+            </p>
+            <ul>
+              <li>explicar a alumnos qué patógenos dominan en cada cuadro,</li>
+              <li>vincular curvas temporales reales con dinámica inmune,</li>
+              <li>
+                hacerse una “intuición geométrica” de la interacción
+                linfocitos–patógenos–tejido.
+              </li>
+            </ul>
+          `,
+
+          microHeader: "Mezcla de patógenos (escenario actual)",
+          microSubheader: "Ajusta el peso relativo de cada patógeno (se normaliza al reaplicar).",
+          microApplyBtn: "Reaplicar mezcla",
+          microResetBtn: "Reset",
+          microSectionBacteria: "Bacterias",
+          microSectionViruses: "Virus",
+          microTypeBacteriaGramPos: "Bacteria Gram+",
+          microTypeBacteriaGramNeg: "Bacteria Gram–",
+          microTypeBacteriaOther: "Bacteria / flora",
+          microTypeVirusResp: "Virus respiratorio",
+          microTypeVirusOther: "Virus",
+          microTypeProbiotic: "Flora beneficiosa / probiótico",
+          microHintChange: "Estos pesos se basan en literatura epidemiológica simplificada, pero puedes modificarlos para escenarios “qué pasaría si…”.",
+        },
+
+        en: {
+          overlayTitle: "3D Immune System (ECC + clinical datasets / CSV)",
+          legendCD4: "CD4⁺ T helper – FITC/Alexa488 (green)",
+          legendCD8: "CD8⁺ cytotoxic T – TRITC/PE (orange-red)",
+          legendB: "B lymphocytes – APC/Cy5 (deep magenta)",
+          legendNK: "NK cells – magenta channel with granules",
+          legendMAC: "Macrophages – Cy3/Alexa555 (yellow-orange, irregular)",
+          legendDC: "Dendritic cells – cyan, star-like",
+          legendGramPos: "Gram+ bacteria – violet cocci/rods",
+          legendGramNeg: "Gram– bacteria – cyan rods",
+          legendVirusEnv: "Enveloped viruses – magenta/yellow spikes",
+          legendSelf: "Tissue cells (self)",
+
+          statKilledLabel: "Pathogens destroyed",
+          statSelfLabel: "Tissue cells damaged",
+          statActiveLabel: "Active lymphocytes",
+          statMicrobeLabel: "Live pathogens",
+
+          overlayExplain:
+            "The volume represents an <strong>infected tissue</strong> with immune cells, pathogens and self cells. " +
+            "Pathogen mixtures roughly follow <strong>real-world epidemiology</strong> for each syndrome (CAP, sepsis, GE, etc.).",
+
+          logTitle: "ECC event log (last decisions)",
+          logFoot: "t | cell | target | signal ≥ θ | outcome",
+
+          controlsTitle: "Simulation controls",
+          lblLang: "Idioma / Language",
+          langEs: "Español",
+          langEn: "English",
+
+          lblDisease: "Disease",
+          lblDataset: "Clinical dataset",
+          lblCsvUpload: "Upload local CSV",
+          lblCsvColumn: "CSV column",
+          lblTemp: "Temperature (°C)",
+          lblAntibiotic: "Antibiotic (level)",
+          lblSteroid: "Immunosuppression",
+          lblBrightness: "Global brightness",
+          lblBgDark: "Darker background",
+          lblFog: "Fog / contrast",
+          lblZoom: "Zoom (mouse wheel)",
+          lblZoomHint: "zoom in/out the scene",
+          lblSim: "Simulation",
+
+          hint:
+            "Camera auto-rotates · Zoom with wheel · Hover to inspect · Change disease/dataset · Space = Pause/Resume",
+
+          theoryHeaderTitle: "ECC algorithm – fibre bundle + datasets + realistic microbiome",
+          theoryBtnOpen: "ECC theory / datasets / what am I seeing?",
+          theoryBtnClose: "Close",
+
+          togglePause: "Pause",
+          toggleResume: "Resume",
+
+          datasetStatusSynthetic:
+            "Using internal ECC curves (didactic model, no external connection).",
+          datasetStatusFluLoading:
+            "Downloading WHO FluNet demo (may fail due to CORS)…",
+          datasetStatusFluOk:
+            "WHO FluNet dataset loaded and normalized. Used as viral load / inflammation curve.",
+          datasetStatusFluFail:
+            "Could not load FluNet (CORS/network). Falling back to internal ECC model.",
+          datasetStatusCsvMode:
+            "CSV mode: upload a .csv file (e.g. derived from sepsis/MIMIC) to build a 0–1 severity curve.",
+          datasetStatusCsvError:
+            "Error parsing CSV. Keeping previous dataset / internal model.",
+          datasetStatusCsvNoNum:
+            "No numeric column found in CSV. Model not updated.",
+          datasetStatusCsvParsed: (file) =>
+            `CSV loaded (${file}). Select the numeric column to map as a 0–1 severity curve.`,
+          datasetStatusCsvColApplied: (col) =>
+            `Using column "${col}" as a 0–1 severity curve for ECC.`,
+
+          hintSeriesFrom: (src) =>
+            `Current ECC curve derived from: ${src}`,
+
+          diseaseNames: {
+            homeostasis: "Homeostasis (healthy)",
+            flu: "Acute viral infection (flu/CAP)",
+            covid: "Severe COVID-19 pneumonia",
+            sepsis: "Bacterial sepsis (Gram–/ICU)",
+            tb: "Pulmonary tuberculosis",
+            ecoli: "Bacterial GE (E. coli, Salmonella, Campylobacter…)",
+            pneumo: "Pneumococcal pneumonia",
+            lupus: "Systemic lupus erythematosus (SLE)",
+            ms: "Multiple sclerosis (MS)",
+            tumor: "Solid tumour with immune escape",
+            immunodef: "Severe immunodeficiency",
+          },
+          diseasePhaseEarly: "Phase: onset / early incubation",
+          diseasePhasePeak: "Phase: peak activity",
+          diseasePhaseLate: "Phase: resolution / chronic",
+
+          scenarioBanner: (label, ds) =>
+            `ECC scenario: ${label}${ds ? " · dataset: " + ds : ""}`,
+
+          theoryHtml: `
+            <h3>1. What are you looking at?</h3>
+            <p>
+              Each time you pick a disease, the system generates a
+              <strong>pathogen mixture</strong> inspired by real data:
+              CAP dominated by <em>Streptococcus pneumoniae</em>, sepsis with
+              lots of <em>E. coli</em>/<em>Klebsiella</em>, GE with
+              <em>Salmonella</em>, <em>Campylobacter</em>, etc.
+            </p>
+            <p>
+              This is conceptual: proportions are based on published
+              epidemiology, simplified for 3D visualisation and teaching
+              rather than clinical decision making.
+            </p>
+
+            <h3>2. How data and visuals connect</h3>
+            <ul>
+              <li>
+                A <strong>time-series dataset</strong> (FluNet, clinical CSV
+                or synthetic) is normalised to 0–1.
+              </li>
+              <li>
+                That curve feeds <em>pathogen load</em>, <em>inflammation</em>
+                and <em>autoimmune bias</em> in the ECC model.
+              </li>
+              <li>
+                For each disease we define a table of
+                <strong>dominant pathogens</strong> (e.g. sepsis:
+                E. coli, Klebsiella, Pseudomonas, Acinetobacter,
+                S. aureus…; GE: Salmonella, Campylobacter, Shigella,
+                E. coli, etc.).
+              </li>
+              <li>
+                The volume is filled with those microbes, respecting those
+                proportions approximately.
+              </li>
+            </ul>
+
+            <h3>3. What this is NOT</h3>
+            <p>
+              It is not a validated physiological simulator, nor does it
+              replace PK/PD models or clinical scores. It is a
+              <strong>visual storytelling and exploration tool</strong>
+              to:
+            </p>
+            <ul>
+              <li>explain which pathogens dominate each syndrome,</li>
+              <li>link real time-series curves to immune dynamics,</li>
+              <li>give a “geometric intuition” of lymphocyte–pathogen–tissue interaction.</li>
+            </ul>
+          `,
+
+          microHeader: "Pathogen mixture (current scenario)",
+          microSubheader: "Adjust relative weight of each pathogen (normalised when mix is reapplied).",
+          microApplyBtn: "Reapply mix",
+          microResetBtn: "Reset",
+          microSectionBacteria: "Bacteria",
+          microSectionViruses: "Viruses",
+          microTypeBacteriaGramPos: "Gram+ bacterium",
+          microTypeBacteriaGramNeg: "Gram– bacterium",
+          microTypeBacteriaOther: "Bacterium / flora",
+          microTypeVirusResp: "Respiratory virus",
+          microTypeVirusOther: "Virus",
+          microTypeProbiotic: "Beneficial flora / probiotic",
+          microHintChange: "Weights are based on simplified epidemiology, but you can adjust them for 'what if' scenarios.",
+        },
+      };
+
+      function tr(key) {
+        return i18n[currentLang][key];
+      }
+
+      /* =========================
+         DOM refs
+         ========================= */
+      const overlayTitleEl   = document.getElementById("overlayTitle");
+      const legendCD4El      = document.getElementById("legendCD4");
+      const legendCD8El      = document.getElementById("legendCD8");
+      const legendBEl        = document.getElementById("legendB");
+      const legendNKEl       = document.getElementById("legendNK");
+      const legendMACEl      = document.getElementById("legendMAC");
+      const legendDCEl       = document.getElementById("legendDC");
+      const legendGramPosEl  = document.getElementById("legendGramPos");
+      const legendGramNegEl  = document.getElementById("legendGramNeg");
+      const legendVirusEnvEl = document.getElementById("legendVirusEnv");
+      const legendSelfEl     = document.getElementById("legendSelf");
+
+      const statKilledLabelEl = document.getElementById("statKilledLabel");
+      const statSelfLabelEl   = document.getElementById("statSelfLabel");
+      const statActiveLabelEl = document.getElementById("statActiveLabel");
+      const statMicrobeLabelEl= document.getElementById("statMicrobeLabel");
+      const overlayExplainEl  = document.getElementById("overlayExplain");
+
+      const killedStatEl  = document.getElementById("killedStat");
+      const selfStatEl    = document.getElementById("selfStat");
+      const activeStatEl  = document.getElementById("activeStat");
+      const microbeStatEl = document.getElementById("microbeStat");
+
+      const tooltip       = document.getElementById("tooltip");
+      const logTitleEl    = document.getElementById("logTitle");
+      const logContentEl  = document.getElementById("logContent");
+      const logFootEl     = document.getElementById("logFoot");
+
+      const controlsTitleEl = document.getElementById("controlsTitle");
+      const lblLangEl       = document.getElementById("lblLang");
+      const langSelect      = document.getElementById("langSelect");
+
+      const lblDiseaseEl    = document.getElementById("lblDisease");
+      const lblDatasetEl    = document.getElementById("lblDataset");
+      const lblCsvUploadEl  = document.getElementById("lblCsvUpload");
+      const lblCsvColumnEl  = document.getElementById("lblCsvColumn");
+
+      const lblTempEl       = document.getElementById("lblTemp");
+      const lblAntibioticEl = document.getElementById("lblAntibiotic");
+      const lblSteroidEl    = document.getElementById("lblSteroid");
+      const lblBrightnessEl = document.getElementById("lblBrightness");
+      const lblBgDarkEl     = document.getElementById("lblBgDark");
+      const lblFogEl        = document.getElementById("lblFog");
+      const lblZoomEl       = document.getElementById("lblZoom");
+      const lblZoomHintEl   = document.getElementById("lblZoomHint");
+      const lblSimEl        = document.getElementById("lblSim");
+
+      const hintEl          = document.getElementById("hint");
+
+      const theoryHeaderTitleEl = document.getElementById("theoryHeaderTitle");
+      const openTheory      = document.getElementById("openTheory");
+      const closeTheory     = document.getElementById("closeTheory");
+      const theoryBody      = document.getElementById("theoryBody");
+      const theoryPanel     = document.getElementById("theoryPanel");
+
+      const toggleSimBtn    = document.getElementById("toggleSimBtn");
+
+      const diseaseSelect   = document.getElementById("diseaseSelect");
+      const diseaseInfoBaseEl = document.getElementById("diseaseInfoBase");
+      const diseaseStageEl    = document.getElementById("diseaseStage");
+      const scenarioBanner    = document.getElementById("scenarioBanner");
+
+      const dataSourceSelect = document.getElementById("dataSourceSelect");
+      const csvUpload        = document.getElementById("csvUpload");
+      const csvColumnRow     = document.getElementById("csvColumnRow");
+      const csvColumnSelect  = document.getElementById("csvColumnSelect");
+      const datasetStatusEl  = document.getElementById("datasetStatus");
+
+      const brightnessSlider   = document.getElementById("brightness");
+      const bgDarkSlider       = document.getElementById("bgDark");
+      const fogSlider          = document.getElementById("fogDensity");
+      const envTempSlider      = document.getElementById("envTemp");
+      const envAntibioticSlider= document.getElementById("envAntibiotic");
+      const envSteroidSlider   = document.getElementById("envSteroid");
+
+      // Micro panel
+      const microPanel       = document.getElementById("microPanel");
+      const microHeaderEl    = document.getElementById("microHeader");
+      const microSubheaderEl = document.getElementById("microSubheader");
+      const microBodyEl      = document.getElementById("microBody");
+      const microApplyBtn    = document.getElementById("microApplyBtn");
+      const microResetBtn    = document.getElementById("microResetBtn");
+      const microTotalBactEl = document.getElementById("microTotalBact");
+      const microTotalVirusEl= document.getElementById("microTotalVirus");
+
+      /* =========================
+         Language helpers
+         ========================= */
+      function applyLanguageTheory() {
+        theoryHeaderTitleEl.textContent = tr("theoryHeaderTitle");
+        theoryBody.innerHTML = i18n[currentLang].theoryHtml;
+        openTheory.textContent = tr("theoryBtnOpen");
+        closeTheory.textContent = tr("theoryBtnClose");
+      }
+
+      function applyLanguageStaticUI() {
+        overlayTitleEl.textContent = tr("overlayTitle");
+        legendCD4El.lastChild.textContent      = " " + tr("legendCD4");
+        legendCD8El.lastChild.textContent      = " " + tr("legendCD8");
+        legendBEl.lastChild.textContent        = " " + tr("legendB");
+        legendNKEl.lastChild.textContent       = " " + tr("legendNK");
+        legendMACEl.lastChild.textContent      = " " + tr("legendMAC");
+        legendDCEl.lastChild.textContent       = " " + tr("legendDC");
+        legendGramPosEl.lastChild.textContent  = " " + tr("legendGramPos");
+        legendGramNegEl.lastChild.textContent  = " " + tr("legendGramNeg");
+        legendVirusEnvEl.lastChild.textContent = " " + tr("legendVirusEnv");
+        legendSelfEl.lastChild.textContent     = " " + tr("legendSelf");
+
+        statKilledLabelEl.textContent  = tr("statKilledLabel");
+        statSelfLabelEl.textContent    = tr("statSelfLabel");
+        statActiveLabelEl.textContent  = tr("statActiveLabel");
+        statMicrobeLabelEl.textContent = tr("statMicrobeLabel");
+
+        overlayExplainEl.innerHTML = tr("overlayExplain");
+
+        logTitleEl.textContent = tr("logTitle");
+        logFootEl.textContent  = tr("logFoot");
+
+        controlsTitleEl.textContent = tr("controlsTitle");
+        lblLangEl.textContent       = tr("lblLang");
+
+        langSelect.options[0].textContent = i18n[currentLang].langEs;
+        langSelect.options[1].textContent = i18n[currentLang].langEn;
+
+        lblDiseaseEl.textContent   = tr("lblDisease");
+        lblDatasetEl.textContent   = tr("lblDataset");
+        lblCsvUploadEl.textContent = tr("lblCsvUpload");
+        lblCsvColumnEl.textContent = tr("lblCsvColumn");
+
+        lblTempEl.textContent       = tr("lblTemp");
+        lblAntibioticEl.textContent = tr("lblAntibiotic");
+        lblSteroidEl.textContent    = tr("lblSteroid");
+        lblBrightnessEl.textContent = tr("lblBrightness");
+        lblBgDarkEl.textContent     = tr("lblBgDark");
+        lblFogEl.textContent        = tr("lblFog");
+        lblZoomEl.textContent       = tr("lblZoom");
+        lblZoomHintEl.textContent   = tr("lblZoomHint");
+        lblSimEl.textContent        = tr("lblSim");
+
+        hintEl.textContent = tr("hint");
+
+        toggleSimBtn.textContent = simulationRunning ? tr("togglePause") : tr("toggleResume");
+
+        microHeaderEl.textContent    = tr("microHeader");
+        microSubheaderEl.textContent = tr("microSubheader") + " " + i18n[currentLang].microHintChange;
+        microApplyBtn.textContent    = tr("microApplyBtn");
+        microResetBtn.textContent    = tr("microResetBtn");
+      }
+
+      function updateDiseaseInfoText() {
+        const preset = DISEASE_PRESETS[currentDiseaseKey];
+        if (!preset) return;
+        const label = preset.labels[currentLang];
+        const desc  = preset.descriptions[currentLang];
+        diseaseInfoBaseEl.innerHTML =
+          `<strong>${label}</strong><br>${desc}<br>` +
+          `<small>θ base ≈ ${ECC.baseSensitivity.toFixed(2)}, ` +
+          `pathogen base ≈ ${ECC.basePathogenLoad.toFixed(2)}, ` +
+          `autoimmunity ≈ ${ECC.baseAutoimmuneBias.toFixed(2)}</small>`;
+      }
+
+      function applyLanguage() {
+        applyLanguageStaticUI();
+        applyLanguageTheory();
+        updateDiseaseInfoText();
+
+        Array.from(diseaseSelect.options).forEach(opt => {
+          const key = opt.value;
+          const baseName = i18n[currentLang].diseaseNames[key];
+          if (baseName) {
+            const idx = opt.textContent.split("·")[0].trim().split(" ")[0];
+            opt.textContent = `${idx} · ${baseName}`;
+          }
+        });
+
+        renderMicroPanelForDisease(currentDiseaseKey);
+      }
+
+      /* =========================
+         ECC + ENV
+         ========================= */
+      let simulationRunning = true;
+      const stats = { killed: 0, selfDamaged: 0, activeLymph: 0 };
+
+      const eccLog = [];
+      function appendLog(entry) {
+        eccLog.push(entry);
+        if (eccLog.length > 80) eccLog.shift();
+        logContentEl.innerHTML = eccLog.join("<br>");
+        logContentEl.scrollTop = logContentEl.scrollHeight;
+      }
+
+      const ECC = {
+        pathogenLoad: 0.3,
+        autoimmuneBias: 0.1,
+        sensitivity: 0.65,
+        dangerBoostProb: 0.1,
+        basePathogenLoad: 0.3,
+        baseAutoimmuneBias: 0.1,
+        baseSensitivity: 0.65,
+        baseDangerBoostProb: 0.1,
+      };
+
+      const ENV = { temperature: 37.0, antibiotic: 0.0, steroid: 0.0 };
+      function updateEnvFromUI() {
+        ENV.temperature = parseFloat(envTempSlider.value);
+        ENV.antibiotic  = parseFloat(envAntibioticSlider.value);
+        ENV.steroid     = parseFloat(envSteroidSlider.value);
+      }
+      envTempSlider.addEventListener("input", updateEnvFromUI);
+      envAntibioticSlider.addEventListener("input", updateEnvFromUI);
+      envSteroidSlider.addEventListener("input", updateEnvFromUI);
+      updateEnvFromUI();
+
+      /* =========================
+         Internal clinical curves
+         ========================= */
+      const CLINICAL_DATA = {
+        default: {
+          pathogen:      [0.1,0.2,0.3,0.4,0.3,0.2,0.15,0.1],
+          inflam:        [0.05,0.1,0.15,0.2,0.2,0.15,0.1,0.05],
+          autoBiasDelta: [0,0,0,0,0,0,0,0],
+        },
+        homeostasis: {
+          pathogen:      [0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1],
+          inflam:        [0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05],
+          autoBiasDelta: [0,0,0,0,0,0,0,0],
+        },
+        flu: {
+          pathogen:      [0.1,0.4,0.8,1.0,0.7,0.4,0.2,0.1],
+          inflam:        [0.05,0.2,0.6,1.0,0.8,0.5,0.2,0.1],
+          autoBiasDelta: [0,0,0,0,0,0,0,0],
+        },
+        covid: {
+          pathogen:      [0.2,0.6,0.9,1.0,0.9,0.7,0.4,0.2],
+          inflam:        [0.1,0.4,0.9,1.2,1.3,1.1,0.7,0.4],
+          autoBiasDelta: [0,0.02,0.05,0.08,0.08,0.06,0.03,0.01],
+        },
+        sepsis: {
+          pathogen:      [0.3,0.7,1.1,1.3,1.3,1.0,0.7,0.4],
+          inflam:        [0.2,0.8,1.3,1.4,1.4,1.1,0.8,0.5],
+          autoBiasDelta: [0,0.03,0.05,0.06,0.05,0.03,0.02,0.01],
+        },
+        tb: {
+          pathogen:      [0.2,0.4,0.7,0.9,0.9,0.8,0.7,0.6],
+          inflam:        [0.1,0.2,0.4,0.6,0.7,0.7,0.6,0.5],
+          autoBiasDelta: [0,0.02,0.04,0.05,0.05,0.04,0.03,0.02],
+        },
+        ecoli: {
+          pathogen:      [0.2,0.5,0.9,1.0,0.7,0.4,0.2,0.1],
+          inflam:        [0.1,0.3,0.8,1.0,0.8,0.5,0.2,0.1],
+          autoBiasDelta: [0,0,0.01,0.02,0.02,0.01,0,0],
+        },
+        pneumo: {
+          pathogen:      [0.2,0.5,0.9,1.0,0.8,0.5,0.3,0.1],
+          inflam:        [0.1,0.3,0.7,1.0,0.9,0.6,0.3,0.1],
+          autoBiasDelta: [0,0.01,0.02,0.03,0.03,0.02,0.01,0],
+        },
+        lupus: {
+          pathogen:      [0.1,0.2,0.3,0.4,0.4,0.4,0.3,0.3],
+          inflam:        [0.1,0.2,0.4,0.6,0.7,0.7,0.6,0.6],
+          autoBiasDelta: [0.1,0.12,0.15,0.18,0.18,0.17,0.16,0.15],
+        },
+        ms: {
+          pathogen:      [0.1,0.15,0.2,0.25,0.25,0.25,0.2,0.2],
+          inflam:        [0.1,0.2,0.4,0.6,0.7,0.7,0.6,0.6],
+          autoBiasDelta: [0.15,0.17,0.2,0.22,0.22,0.21,0.2,0.2],
+        },
+        tumor: {
+          pathogen:      [0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45],
+          inflam:        [0.05,0.06,0.08,0.1,0.12,0.13,0.14,0.15],
+          autoBiasDelta: [0,0.01,0.01,0.02,0.02,0.02,0.02,0.02],
+        },
+        immunodef: {
+          pathogen:      [0.2,0.4,0.8,1.0,1.1,1.1,1.0,0.9],
+          inflam:        [0.05,0.1,0.2,0.3,0.3,0.25,0.2,0.2],
+          autoBiasDelta: [0,0,0,0,0,0,0,0],
+        },
+      };
+
+      /* =========================
+         Dataset / CSV
+         ========================= */
+      let currentDataSourceKey = "synthetic";
+      let externalDataset = null;
+      let externalDatasetMeta = null;
+      let currentCsvParsed = null;
+
+      function parseCSV(text) {
+        const lines = text.trim().split(/\r?\n/);
+        if (!lines.length) return { header: [], rows: [] };
+        const sep = lines[0].includes(";") && !lines[0].includes(",") ? ";" : ",";
+        const header = lines[0].split(sep).map(h => h.trim());
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(sep);
+          const row = {};
+          header.forEach((h, idx) => {
+            row[h] = (parts[idx] || "").trim();
+          });
+          rows.push(row);
+        }
+        return { header, rows };
+      }
+
+      function buildSeriesFromNumericColumn(values, targetLen = 32) {
+        const clean = values.filter(v => Number.isFinite(v));
+        if (!clean.length) return null;
+        const min = Math.min(...clean);
+        const max = Math.max(...clean);
+        const span = max - min || 1;
+        const norm = clean.map(v => (v - min) / span);
+        const nTarget = Math.min(targetLen, norm.length);
+        const step = Math.max(1, Math.floor(norm.length / nTarget));
+        const sampled = [];
+        for (let i = 0; i < norm.length; i += step) {
+          sampled.push(norm[i]);
+          if (sampled.length >= nTarget) break;
+        }
+        return sampled;
+      }
+
+      async function loadFluNetDemo() {
+        datasetStatusEl.textContent = tr("datasetStatusFluLoading");
+        externalDataset = null;
+        externalDatasetMeta = null;
+        try {
+          const url = "https://xmart-api-public.who.int/FLUMART/VIW_FNT?$format=csv";
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const text = await resp.text();
+          const { header, rows } = parseCSV(text);
+          if (!header.length || !rows.length) throw new Error("CSV vacío");
+
+          const infCols = header.filter(h => h.toUpperCase().startsWith("INF_") || h.toUpperCase() === "INF_ALL");
+          if (!infCols.length) throw new Error("No INF_* columns");
+
+          const totals = rows.map(r => {
+            let sum = 0;
+            for (const h of infCols) {
+              const raw = (r[h] || "").replace(",", ".");
+              const v = parseFloat(raw);
+              if (Number.isFinite(v)) sum += v;
+            }
+            return sum > 0 ? sum : NaN;
+          }).filter(v => Number.isFinite(v));
+
+          const series = buildSeriesFromNumericColumn(totals, 32);
+          if (!series) throw new Error("Sin serie válida");
+
+          const pathogen = series;
+          const inflam   = series.map(v => Math.min(1.3, v * 1.1));
+          const autoBiasDelta = series.map(() => 0);
+
+          externalDataset = { pathogen, inflam, autoBiasDelta };
+          externalDatasetMeta = {
+            label: "WHO FluNet (aggregated flu detections, normalised)",
+            source: "FLUMART/VIW_FNT",
+            type: "fluNet",
+          };
+          datasetStatusEl.textContent = tr("datasetStatusFluOk");
+
+          const minVal = Math.min(...totals);
+          const maxVal = Math.max(...totals);
+          const mean   = totals.reduce((a,b)=>a+b,0)/totals.length;
+          appendLog(`FluNet CSV: INF_* columns = ${infCols.join(", ")}`);
+          appendLog(`FluNet totals: n=${totals.length}, min=${minVal.toFixed(2)}, max=${maxVal.toFixed(2)}, mean=${mean.toFixed(2)}`);
+          appendLog(`FluNet series normalized to [0,1] length=${series.length}`);
+        } catch (err) {
+          console.error(err);
+          externalDataset = null;
+          externalDatasetMeta = null;
+          datasetStatusEl.textContent = tr("datasetStatusFluFail");
+        }
+      }
+
+      function applyCsvColumnSelection(colName) {
+        if (!currentCsvParsed) return;
+        const col = currentCsvParsed.columns[colName];
+        if (!col) return;
+        const series = buildSeriesFromNumericColumn(col.values, 32);
+        if (!series) {
+          datasetStatusEl.textContent = tr("datasetStatusCsvError");
+          return;
+        }
+        const pathogen = series;
+        const inflam   = series.map(v => Math.min(1.3, v * 1.1));
+        const autoBiasDelta = series.map(() => 0);
+
+        externalDataset = { pathogen, inflam, autoBiasDelta };
+        externalDatasetMeta = {
+          label: `CSV ${currentCsvParsed.fileName} · ${colName}`,
+          source: "user CSV (normalized 0–1)",
+          type: currentDataSourceKey,
+        };
+        datasetStatusEl.textContent = i18n[currentLang].datasetStatusCsvColApplied(colName);
+        appendLog(`CSV column "${colName}": n=${col.count}, min=${col.min.toFixed(3)}, max=${col.max.toFixed(3)}, mean=${col.mean.toFixed(3)}`);
+      }
+
+      csvUpload.addEventListener("change", () => {
+        const file = csvUpload.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const { header, rows } = parseCSV(e.target.result);
+            if (!header.length || !rows.length) throw new Error("CSV vacío");
+
+            const numericCols = [];
+            const columns = {};
+            for (const h of header) {
+              const vals = [];
+              for (const r of rows) {
+                const raw = (r[h] || "").replace(",", ".");
+                const v = parseFloat(raw);
+                if (raw !== "" && Number.isFinite(v)) vals.push(v);
+              }
+              if (vals.length) {
+                const min = Math.min(...vals);
+                const max = Math.max(...vals);
+                const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+                numericCols.push(h);
+                columns[h] = { values: vals, min, max, mean, count: vals.length };
+              }
+            }
+
+            if (!numericCols.length) {
+              datasetStatusEl.textContent = tr("datasetStatusCsvNoNum");
+              currentCsvParsed = null;
+              csvColumnRow.style.display = "none";
+              return;
+            }
+
+            currentCsvParsed = { fileName: file.name, columns };
+
+            appendLog(`CSV "${file.name}" loaded. Numeric columns:`);
+            numericCols.forEach(h => {
+              const c = columns[h];
+              appendLog(`  - ${h}: n=${c.count}, min=${c.min.toFixed(3)}, max=${c.max.toFixed(3)}, mean=${c.mean.toFixed(3)}`);
+            });
+
+            csvColumnSelect.innerHTML = "";
+            numericCols.forEach(h => {
+              const c = columns[h];
+              const opt = document.createElement("option");
+              opt.value = h;
+              opt.textContent = `${h} (n=${c.count}, min=${c.min.toFixed(2)}, max=${c.max.toFixed(2)})`;
+              csvColumnSelect.appendChild(opt);
+            });
+            csvColumnRow.style.display = "flex";
+            datasetStatusEl.textContent = i18n[currentLang].datasetStatusCsvParsed(file.name);
+
+            applyCsvColumnSelection(numericCols[0]);
+
+          } catch (err) {
+            console.error(err);
+            datasetStatusEl.textContent = tr("datasetStatusCsvError");
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      csvColumnSelect.addEventListener("change", () => {
+        applyCsvColumnSelection(csvColumnSelect.value);
+      });
+
+      dataSourceSelect.addEventListener("change", () => {
+        currentDataSourceKey = dataSourceSelect.value;
+        externalDataset = null;
+        externalDatasetMeta = null;
+
+        if (currentDataSourceKey === "synthetic") {
+          datasetStatusEl.textContent = tr("datasetStatusSynthetic");
+        } else if (currentDataSourceKey === "fluNetDemo") {
+          csvColumnRow.style.display = "none";
+          loadFluNetDemo();
+        } else {
+          datasetStatusEl.textContent = tr("datasetStatusCsvMode");
+        }
+      });
+
+      function sampleClinicalCurves(diseaseKey, progress) {
+        let data;
+        if (currentDataSourceKey !== "synthetic" && externalDataset) {
+          data = externalDataset;
+        } else {
+          data = CLINICAL_DATA[diseaseKey] || CLINICAL_DATA.default;
+        }
+        const n = data.pathogen.length;
+        const idx = Math.min(n - 1, Math.max(0, Math.floor(progress * (n - 1))));
+        return {
+          pathogenFactor: data.pathogen[idx],
+          inflamFactor:   data.inflam[idx],
+          autoBiasDelta:  data.autoBiasDelta[idx],
+        };
+      }
+
+      /* =========================
+         Disease presets
+         ========================= */
+      const DISEASE_PRESETS = {
+        homeostasis: {
+          kind: "healthy",
+          labels: {
+            es: "Homeostasis (sano)",
+            en: "Homeostasis (healthy)",
+          },
+          descriptions: {
+            es: "Poca carga patógena, umbral de activación moderado, autoinmunidad baja. Vigilancia normal.",
+            en: "Low pathogen load, moderate activation threshold, low autoimmunity. Normal surveillance.",
+          },
+          params: {
+            pathogenLoad: 0.3,
+            autoimmuneBias: 0.1,
+            sensitivity: 0.65,
+            dangerBoostProb: 0.10,
+          },
+        },
+        flu: {
+          kind: "viral",
+          labels: {
+            es: "Infección vírica aguda (gripe/CAP)",
+            en: "Acute viral infection (flu/CAP)",
+          },
+          descriptions: {
+            es: "Carga vírica moderada-alta con pico agudo; cocirculan bacterias respiratorias típicas.",
+            en: "Moderate–high viral load with a sharp peak; typical respiratory bacteria co-circulate.",
+          },
+          params: {
+            pathogenLoad: 0.7,
+            autoimmuneBias: 0.12,
+            sensitivity: 0.6,
+            dangerBoostProb: 0.25,
+          },
+        },
+        covid: {
+          kind: "viral",
+          labels: {
+            es: "Neumonía COVID-19 grave",
+            en: "Severe COVID-19 pneumonia",
+          },
+          descriptions: {
+            es: "SARS-CoV-2 dominante, con coinfecciones bacterianas posibles y gran inflamación.",
+            en: "SARS-CoV-2 dominates, with possible bacterial co-infections and strong inflammation.",
+          },
+          params: {
+            pathogenLoad: 0.85,
+            autoimmuneBias: 0.18,
+            sensitivity: 0.55,
+            dangerBoostProb: 0.35,
+          },
+        },
+        sepsis: {
+          kind: "bacterial",
+          labels: {
+            es: "Sepsis bacteriana (Gram–/UCI)",
+            en: "Bacterial sepsis (Gram–/ICU)",
+          },
+          descriptions: {
+            es: "Predominio de E. coli, Klebsiella, Pseudomonas, Acinetobacter y S. aureus.",
+            en: "Dominated by E. coli, Klebsiella, Pseudomonas, Acinetobacter and S. aureus.",
+          },
+          params: {
+            pathogenLoad: 0.95,
+            autoimmuneBias: 0.2,
+            sensitivity: 0.5,
+            dangerBoostProb: 0.45,
+          },
+        },
+        tb: {
+          kind: "bacterial",
+          labels: {
+            es: "Tuberculosis pulmonar",
+            en: "Pulmonary tuberculosis",
+          },
+          descriptions: {
+            es: "Casi todo el riesgo lo marca Mycobacterium tuberculosis en focos localizados.",
+            en: "Almost all the risk comes from localised Mycobacterium tuberculosis foci.",
+          },
+          params: {
+            pathogenLoad: 0.75,
+            autoimmuneBias: 0.15,
+            sensitivity: 0.6,
+            dangerBoostProb: 0.25,
+          },
+        },
+        ecoli: {
+          kind: "bacterial",
+          labels: {
+            es: "GE bacteriana (E. coli, Salmonella, Campylobacter…)",
+            en: "Bacterial GE (E. coli, Salmonella, Campylobacter…)",
+          },
+          descriptions: {
+            es: "Mezcla intestinal típica de E. coli patógena, Salmonella, Campylobacter y Shigella.",
+            en: "Typical intestinal mix of pathogenic E. coli, Salmonella, Campylobacter and Shigella.",
+          },
+          params: {
+            pathogenLoad: 0.8,
+            autoimmuneBias: 0.14,
+            sensitivity: 0.58,
+            dangerBoostProb: 0.3,
+          },
+        },
+        pneumo: {
+          kind: "bacterial",
+          labels: {
+            es: "Neumonía neumocócica",
+            en: "Pneumococcal pneumonia",
+          },
+          descriptions: {
+            es: "Streptococcus pneumoniae dominante, con H. influenzae y otros patógenos respiratorios.",
+            en: "Streptococcus pneumoniae dominates, with H. influenzae and other respiratory pathogens.",
+          },
+          params: {
+            pathogenLoad: 0.8,
+            autoimmuneBias: 0.16,
+            sensitivity: 0.6,
+            dangerBoostProb: 0.28,
+          },
+        },
+        lupus: {
+          kind: "autoinmune",
+          labels: {
+            es: "Lupus eritematoso sistémico (LES)",
+            en: "Systemic lupus erythematosus (SLE)",
+          },
+          descriptions: {
+            es: "Pocos patógenos; daño mediado por autoinmunidad sistémica y depósitos inmunes.",
+            en: "Few pathogens; damage mainly driven by systemic autoimmunity and immune complexes.",
+          },
+          params: {
+            pathogenLoad: 0.45,
+            autoimmuneBias: 0.4,
+            sensitivity: 0.6,
+            dangerBoostProb: 0.2,
+          },
+        },
+        ms: {
+          kind: "autoinmune",
+          labels: {
+            es: "Esclerosis múltiple (EM)",
+            en: "Multiple sclerosis (MS)",
+          },
+          descriptions: {
+            es: "Ataque a tejido neural; muy pocas bacterias en escena, algo de flora de fondo.",
+            en: "Attack on neural tissue; very few bacteria, mostly background flora.",
+          },
+          params: {
+            pathogenLoad: 0.35,
+            autoimmuneBias: 0.5,
+            sensitivity: 0.62,
+            dangerBoostProb: 0.22,
+          },
+        },
+        tumor: {
+          kind: "tumor",
+          labels: {
+            es: "Tumor sólido con escape inmune",
+            en: "Solid tumour with immune escape",
+          },
+          descriptions: {
+            es: "Pocos patógenos; las células tumorales emiten señales débiles a la vigilancia inmune.",
+            en: "Very few pathogens; tumour cells emit weak activation cues to immune surveillance.",
+          },
+          params: {
+            pathogenLoad: 0.25,
+            autoimmuneBias: 0.1,
+            sensitivity: 0.7,
+            dangerBoostProb: 0.05,
+          },
+        },
+        immunodef: {
+          kind: "immunodef",
+          labels: {
+            es: "Inmunodeficiencia severa",
+            en: "Severe immunodeficiency",
+          },
+          descriptions: {
+            es: "Carga patógena elevada, múltiples gérmenes oportunistas y respuesta floja.",
+            en: "High pathogen load, many opportunistic pathogens and a weak response.",
+          },
+          params: {
+            pathogenLoad: 0.7,
+            autoimmuneBias: 0.08,
+            sensitivity: 0.8,
+            dangerBoostProb: 0.06,
+          },
+        },
+      };
+
+      /* =========================
+         THREE.js scene
+         ========================= */
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.008);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 1);
+      document.body.appendChild(renderer.domElement);
+
+      const camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        2000
+      );
+      camera.position.set(0, 80, 180);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.9);
+      scene.add(hemi);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+      dirLight.position.set(60, 90, 40);
+      scene.add(dirLight);
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambient);
+
+      const baseLight = {
+        hemi: hemi.intensity,
+        dir: dirLight.intensity,
+        amb: ambient.intensity,
+      };
+
+      const tissueSize = 150;
+      const boxGeom = new THREE.BoxGeometry(tissueSize, tissueSize, tissueSize);
+      const boxMat = new THREE.MeshBasicMaterial({
+        color: 0x111827,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.16,
+      });
+      const tissue = new THREE.Mesh(boxGeom, boxMat);
+      scene.add(tissue);
+
+      const glowGeom = new THREE.SphereGeometry(18, 32, 32);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x00FF4F,
+        transparent: true,
+        opacity: 0.3,
+      });
+      const glow = new THREE.Mesh(glowGeom, glowMat);
+      scene.add(glow);
+
+      const cytokineParticles = [];
+      const tmpVec = new THREE.Vector3();
+      const upVec  = new THREE.Vector3(0, 1, 0);
+
+      function rndBox(size) {
+        return (Math.random() - 0.5) * size;
+      }
+
+      (function createCytokines() {
+        const particleGeom = new THREE.SphereGeometry(0.35, 8, 8);
+        for (let i = 0; i < 260; i++) {
+          const color = new THREE.Color().setHSL(0.55 + Math.random()*0.3, 1.0, 0.6 + Math.random()*0.2);
+          const mat = new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.5 + Math.random()*0.3,
+          });
+          const p = new THREE.Mesh(particleGeom, mat);
+          p.position.set(
+            rndBox(tissueSize),
+            rndBox(tissueSize),
+            rndBox(tissueSize)
+          );
+          scene.add(p);
+          cytokineParticles.push({
+            mesh: p,
+            baseOpacity: mat.opacity,
+            phase: Math.random()*Math.PI*2,
+            speed: 0.4 + Math.random()*0.5
+          });
+        }
+      })();
+
+      function perturbSphere(geometry, amplitude) {
+        const pos = geometry.attributes.position;
+        const normal = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          normal.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
+          const offset = (Math.random() - 0.5) * amplitude;
+          pos.setXYZ(
+            i,
+            pos.getX(i) + normal.x * offset,
+            pos.getY(i) + normal.y * offset,
+            pos.getZ(i) + normal.z * offset
+          );
+        }
+        pos.needsUpdate = true;
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      function makeLymphocyteCore(colorHex, radius) {
+        const group = new THREE.Group();
+        const g = new THREE.SphereGeometry(radius, 28, 28);
+        perturbSphere(g, radius * 0.25);
+        const m = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 1.1,
+          metalness: 0.35,
+          roughness: 0.45,
+          transparent: true,
+          opacity: 0.98,
+        });
+        const cell = new THREE.Mesh(g, m);
+        group.add(cell);
+
+        const nucleusGeom = new THREE.SphereGeometry(radius * 0.65, 24, 24);
+        const nucleusMat  = new THREE.MeshStandardMaterial({
+          color: 0x0f172a,
+          emissive: 0x020617,
+          emissiveIntensity: 0.5,
+          metalness: 0.1,
+          roughness: 0.9,
+          transparent: true,
+          opacity: 0.9,
+        });
+        const nucleus = new THREE.Mesh(nucleusGeom, nucleusMat);
+        nucleus.position.set(radius * 0.12, radius * 0.1, -radius * 0.05);
+        group.add(nucleus);
+
+        return group;
+      }
+
+      function addSurfaceIgClusters(group, colorHex, radius, count) {
+        const dotGeom = new THREE.SphereGeometry(radius * 0.18, 10, 10);
+        const dotMat  = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 1.3,
+          metalness: 0.4,
+          roughness: 0.3,
+        });
+        for (let i = 0; i < count; i++) {
+          const dot = new THREE.Mesh(dotGeom, dotMat);
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).normalize();
+          dot.position.copy(dir.multiplyScalar(radius * (1.1 + Math.random()*0.15)));
+          group.add(dot);
+        }
+      }
+
+      function addGranulesInside(group, granColorHex, radius, count) {
+        const granGeom = new THREE.SphereGeometry(radius * 0.2, 10, 10);
+        const granMat  = new THREE.MeshStandardMaterial({
+          color: granColorHex,
+          emissive: granColorHex,
+          emissiveIntensity: 1.5,
+          metalness: 0.5,
+          roughness: 0.3,
+          transparent: true,
+          opacity: 0.9,
+        });
+        for (let i = 0; i < count; i++) {
+          const gran = new THREE.Mesh(granGeom, granMat);
+          gran.position.set(
+            (Math.random()-0.5) * radius * 0.9,
+            (Math.random()-0.5) * radius * 0.9,
+            (Math.random()-0.5) * radius * 0.9
+          );
+          group.add(gran);
+        }
+      }
+
+      function makeTCell(colorHex, radius, compact=false) {
+        const group = makeLymphocyteCore(colorHex, radius);
+        const bumpsGeom = new THREE.SphereGeometry(radius * 0.12, 8, 8);
+        const bumpsMat  = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 1.2,
+          metalness: 0.4,
+          roughness: 0.35,
+        });
+        const nBumps = compact ? 8 : 14;
+        for (let i = 0; i < nBumps; i++) {
+          const bump = new THREE.Mesh(bumpsGeom, bumpsMat);
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).normalize();
+          bump.position.copy(dir.multiplyScalar(radius * 1.05));
+          group.add(bump);
+        }
+        if (compact) group.scale.set(0.95, 0.95, 0.95);
+        return group;
+      }
+
+      function makeBCell(colorHex) {
+        const radius = 3.1;
+        const group = makeLymphocyteCore(colorHex, radius);
+        addSurfaceIgClusters(group, 0xFF9AD3, radius, 18);
+        return group;
+      }
+
+      function makeNKCell(colorHex) {
+        const radius = 3.3;
+        const group = makeLymphocyteCore(colorHex, radius);
+        addGranulesInside(group, 0xFFE34D, radius, 12);
+        return group;
+      }
+
+      function makeMacrophageCell(colorHex) {
+        const group = new THREE.Group();
+        const g = new THREE.SphereGeometry(4.2, 32, 32);
+        perturbSphere(g, 1.8);
+        const m = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 1.2,
+          metalness: 0.45,
+          roughness: 0.45,
+          transparent: true,
+          opacity: 0.96,
+        });
+        const core = new THREE.Mesh(g, m);
+        group.add(core);
+
+        const pseudoGeom = new THREE.ConeGeometry(0.6, 2.6, 10);
+        const pseudoMat  = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: 0xFFF7C2,
+          emissiveIntensity: 0.7,
+          metalness: 0.3,
+          roughness: 0.5,
+        });
+        for (let i = 0; i < 16; i++) {
+          const pseudo = new THREE.Mesh(pseudoGeom, pseudoMat);
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).normalize();
+          pseudo.position.copy(dir.clone().multiplyScalar(4.1));
+          pseudo.lookAt(dir.clone().multiplyScalar(6.0));
+          group.add(pseudo);
+        }
+        return group;
+      }
+
+      function makeDendriticCell(colorHex) {
+        const group = new THREE.Group();
+        const g = new THREE.SphereGeometry(3.0, 24, 24);
+        perturbSphere(g, 0.8);
+        const m = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: colorHex,
+          emissiveIntensity: 1.0,
+          metalness: 0.35,
+          roughness: 0.45,
+          transparent: true,
+          opacity: 0.97,
+        });
+        const core = new THREE.Mesh(g, m);
+        group.add(core);
+
+        const spikeGeom = new THREE.ConeGeometry(0.32, 3.2, 8);
+        const spikeMat = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: 0xffffff,
+          emissiveIntensity: 0.7,
+        });
+        for (let i = 0; i < 20; i++) {
+          const spike = new THREE.Mesh(spikeGeom, spikeMat);
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).normalize();
+          spike.position.copy(dir.clone().multiplyScalar(3.2));
+          spike.lookAt(dir.clone().multiplyScalar(6.0));
+          group.add(spike);
+        }
+        return group;
+      }
+
+      function makeSelfCell() {
+        const g = new THREE.SphereGeometry(4.8, 26, 26);
+        perturbSphere(g, 0.5);
+        const m = new THREE.MeshStandardMaterial({
+          color: 0xFB923C,
+          emissive: 0xF97316,
+          emissiveIntensity: 0.7,
+          metalness: 0.3,
+          roughness: 0.4,
+          transparent: true,
+          opacity: 0.9,
+        });
+        return new THREE.Mesh(g, m);
+      }
+
+      function makeBacteriumFromSpec(spec) {
+        const group = new THREE.Group();
+        const radius = 1.3;
+        const length = 6.4;
+        const color = spec.color;
+
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 1.0,
+          metalness: 0.45,
+          roughness: 0.45,
+        });
+
+        if (spec.shape.includes("Coco")) {
+          const spheres = 3 + Math.floor(Math.random()*3);
+          const sphGeom = new THREE.SphereGeometry(radius, 18, 18);
+          for (let i = 0; i < spheres; i++) {
+            const sph = new THREE.Mesh(sphGeom, mat);
+            sph.position.set(
+              (Math.random()-0.5)*2.5,
+              (Math.random()-0.5)*2.5,
+              (Math.random()-0.5)*2.5
+            );
+            group.add(sph);
+          }
+        } else {
+          const cylGeom = new THREE.CylinderGeometry(radius, radius, length, 18, 1, true);
+          const sphGeom = new THREE.SphereGeometry(radius, 18, 18);
+          const cyl = new THREE.Mesh(cylGeom, mat);
+          const sph1 = new THREE.Mesh(sphGeom, mat);
+          const sph2 = new THREE.Mesh(sphGeom, mat);
+          sph1.position.y = length / 2;
+          sph2.position.y = -length / 2;
+          group.add(cyl, sph1, sph2);
+        }
+        return group;
+      }
+
+      function makeVirusFromSpec(spec) {
+        const group = new THREE.Group();
+        const baseColor = spec.color;
+
+        const coreGeom = new THREE.IcosahedronGeometry(2.0, 1);
+        const coreMat = new THREE.MeshStandardMaterial({
+          color: baseColor,
+          emissive: baseColor,
+          emissiveIntensity: 1.2,
+          metalness: 0.45,
+          roughness: 0.35,
+        });
+        const core = new THREE.Mesh(coreGeom, coreMat);
+        group.add(core);
+
+        const spikeGeom = new THREE.ConeGeometry(0.4, 1.6, 8);
+        const spikeMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0xffffff,
+          emissiveIntensity: 1.1,
+          metalness: 0.3,
+          roughness: 0.4,
+        });
+
+        for (let i = 0; i < 28; i++) {
+          const spike = new THREE.Mesh(spikeGeom, spikeMat);
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).normalize();
+          spike.position.copy(dir.clone().multiplyScalar(2.1));
+          spike.lookAt(dir.clone().multiplyScalar(3.4));
+          group.add(spike);
+        }
+        return group;
+      }
+
+      /* =========================
+         Immune & microbe databases
+         ========================= */
+      const IMMUNE_TYPES = [
+        { key: "T_CD4", label: "Linfocito T helper CD4⁺", color: 0x00FF4F,
+          role: "Coordina respuesta adaptativa.",
+          activation: "Reconoce péptidos en MHC-II + coestimulación y citoquinas.",
+          maker: (color) => makeTCell(color, 3.2, false),
+        },
+        { key: "T_CD8", label: "Linfocito T citotóxico CD8⁺", color: 0xFF4500,
+          role: "Mata células infectadas/tumorales.",
+          activation: "Reconoce péptidos en MHC-I alterado.",
+          maker: (color) => makeTCell(color, 3.0, true),
+        },
+        { key: "B", label: "Linfocito B", color: 0xFF1493,
+          role: "Produce anticuerpos y memoria humoral.",
+          activation: "BCR + ayuda T.",
+          maker: (color) => makeBCell(color),
+        },
+        { key: "NK", label: "Célula NK", color: 0xFF00FF,
+          role: "Elimina células con MHC-I bajo o estrés.",
+          activation: "Balance receptores activadores/inhibidores.",
+          maker: (color) => makeNKCell(color),
+        },
+        { key: "MAC", label: "Macrófago", color: 0xFFB300,
+          role: "Fagocita patógenos, presenta Ag y remodela tejido.",
+          activation: "PRRs + citoquinas (IFN-γ).",
+          maker: (color) => makeMacrophageCell(color),
+        },
+        { key: "DC", label: "Célula dendrítica", color: 0x00E5FF,
+          role: "Presentadora de antígeno a T naive.",
+          activation: "Captura Ag, migra a ganglios y activa T.",
+          maker: (color) => makeDendriticCell(color),
+        },
+      ];
+
+      const BACTERIA_DB = [
+        {
+          name: "Escherichia coli",
+          gram: "Gram-negativa",
+          shape: "Bacilo",
+          oxygen: "Anaerobio facultativo",
+          niche: "Intestino grueso, urinario",
+          pathogenicity: "Comensal / algunas cepas patógenas",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Klebsiella pneumoniae",
+          gram: "Gram-negativa",
+          shape: "Bacilo",
+          oxygen: "Anaerobio facultativo",
+          niche: "Intestinal, respiratorio, UCI",
+          pathogenicity: "Oportunista, frecuente en sepsis/UCI",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Pseudomonas aeruginosa",
+          gram: "Gram-negativa",
+          shape: "Bacilo",
+          oxygen: "Aerobio estricto",
+          niche: "Ambiente, hospitales",
+          pathogenicity: "Oportunista resistente",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Acinetobacter baumannii",
+          gram: "Gram-negativa",
+          shape: "Cocobacilo",
+          oxygen: "Aerobio",
+          niche: "UCI, superficies hospitalarias",
+          pathogenicity: "Oportunista multirresistente",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Staphylococcus aureus",
+          gram: "Gram-positiva",
+          shape: "Coco en racimos",
+          oxygen: "Anaerobio facultativo",
+          niche: "Piel, fosas nasales",
+          pathogenicity: "Oportunista frecuente",
+          color: 0xC084FC,
+        },
+        {
+          name: "Enterococcus spp.",
+          gram: "Gram-positiva",
+          shape: "Coco",
+          oxygen: "Anaerobio facultativo",
+          niche: "Intestinal",
+          pathogenicity: "Oportunista en UCI",
+          color: 0xC084FC,
+        },
+        {
+          name: "Streptococcus pyogenes",
+          gram: "Gram-positiva",
+          shape: "Coco en cadenas",
+          oxygen: "Anaerobio facultativo",
+          niche: "Orofaringe, piel",
+          pathogenicity: "Patógeno invasivo (fascitis, sepsis)",
+          color: 0xC084FC,
+        },
+        {
+          name: "Streptococcus pneumoniae",
+          gram: "Gram-positiva",
+          shape: "Diplococo/cadenas",
+          oxygen: "Anaerobio facultativo",
+          niche: "Vía respiratoria superior",
+          pathogenicity: "Principal causa de CAP clásica",
+          color: 0xC084FC,
+        },
+        {
+          name: "Haemophilus influenzae",
+          gram: "Gram-negativa",
+          shape: "Cocobacilo",
+          oxygen: "Anaerobio facultativo",
+          niche: "Vía aérea superior",
+          pathogenicity: "Causa de CAP y exacerbaciones respiratorias",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Moraxella catarrhalis",
+          gram: "Gram-negativa",
+          shape: "Coco/diplococo",
+          oxygen: "Aerobio",
+          niche: "Vía aérea superior",
+          pathogenicity: "Otitis, sinusitis, CAP leve",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Salmonella enterica",
+          gram: "Gram-negativa",
+          shape: "Bacilo",
+          oxygen: "Anaerobio facultativo",
+          niche: "Intestinal",
+          pathogenicity: "GE no tifoidal, bacteriemia",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Campylobacter jejuni",
+          gram: "Gram-negativa",
+          shape: "Bacilo curvado",
+          oxygen: "Microaerófilo",
+          niche: "Intestinal",
+          pathogenicity: "GE bacteriana muy frecuente",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Shigella spp.",
+          gram: "Gram-negativa",
+          shape: "Bacilo",
+          oxygen: "Anaerobio facultativo",
+          niche: "Intestinal",
+          pathogenicity: "GE invasiva (disentería)",
+          color: 0x38BDF8,
+        },
+        {
+          name: "Mycobacterium tuberculosis",
+          gram: "Ácido-alcohol resistente",
+          shape: "Bacilo delgado",
+          oxygen: "Aerobio estricto",
+          niche: "Alvéolos pulmonares",
+          pathogenicity: "Patógeno de tuberculosis",
+          color: 0xA855F7,
+        },
+        {
+          name: "Lactobacillus acidophilus",
+          gram: "Gram-positiva",
+          shape: "Bacilo",
+          oxygen: "Microaerófilo",
+          niche: "Microbiota intestinal/vaginal",
+          pathogenicity: "Beneficioso / probiótico",
+          color: 0x22C55E,
+        },
+      ];
+
+      const VIRUS_DB = [
+        {
+          name: "Influenza A",
+          genome: "ARN monocatenario segmentado",
+          envelope: "Envuelto, proteínas H y N",
+          tropism: "Epitelio respiratorio",
+          pathogenicity: "Infección respiratoria aguda",
+          color: 0xFF80FF,
+        },
+        {
+          name: "Influenza B",
+          genome: "ARN monocatenario segmentado",
+          envelope: "Envuelto",
+          tropism: "Epitelio respiratorio",
+          pathogenicity: "Infección respiratoria aguda",
+          color: 0xFFB3FF,
+        },
+        {
+          name: "SARS-CoV-2",
+          genome: "ARN monocatenario (+)",
+          envelope: "Envuelto, proteína S",
+          tropism: "Epitelio respiratorio, endotelio",
+          pathogenicity: "COVID-19",
+          color: 0xFACC15,
+        },
+        {
+          name: "Rhinovirus",
+          genome: "ARN monocatenario (+)",
+          envelope: "No envuelto",
+          tropism: "Vía aérea superior",
+          pathogenicity: "Resfriado común, coinfecciones respiratorias",
+          color: 0x93C5FD,
+        },
+        {
+          name: "Virus respiratorio sincitial (RSV)",
+          genome: "ARN monocatenario (-)",
+          envelope: "Envuelto",
+          tropism: "Vía aérea inferior en lactantes/ancianos",
+          pathogenicity: "Bronquiolitis, neumonía",
+          color: 0xFF60FF,
+        },
+      ];
+
+      /* =========================
+         Disease-specific microbiome
+         ========================= */
+      const DISEASE_MICRO_BASE = {
+        homeostasis: {
+          totalViruses: 0.05,
+          totalBacteria: 0.95,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.35 },
+            { name: "Lactobacillus acidophilus", weight: 0.25 },
+            { name: "Staphylococcus aureus", weight: 0.2 },
+            { name: "Enterococcus spp.", weight: 0.2 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        flu: {
+          totalViruses: 0.7,
+          totalBacteria: 0.3,
+          viruses: [
+            { name: "Influenza A", weight: 0.55 },
+            { name: "Influenza B", weight: 0.15 },
+            { name: "SARS-CoV-2", weight: 0.15 },
+            { name: "Rhinovirus", weight: 0.1 },
+            { name: "Virus respiratorio sincitial (RSV)", weight: 0.05 },
+          ],
+          bacteria: [
+            { name: "Streptococcus pneumoniae", weight: 0.5 },
+            { name: "Haemophilus influenzae", weight: 0.25 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Moraxella catarrhalis", weight: 0.1 },
+          ],
+        },
+        covid: {
+          totalViruses: 0.7,
+          totalBacteria: 0.3,
+          viruses: [
+            { name: "SARS-CoV-2", weight: 0.75 },
+            { name: "Influenza A", weight: 0.15 },
+            { name: "Virus respiratorio sincitial (RSV)", weight: 0.1 },
+          ],
+          bacteria: [
+            { name: "Streptococcus pneumoniae", weight: 0.35 },
+            { name: "Staphylococcus aureus", weight: 0.25 },
+            { name: "Klebsiella pneumoniae", weight: 0.2 },
+            { name: "Pseudomonas aeruginosa", weight: 0.2 },
+          ],
+        },
+        sepsis: {
+          totalViruses: 0.02,
+          totalBacteria: 0.98,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.25 },
+            { name: "Klebsiella pneumoniae", weight: 0.15 },
+            { name: "Pseudomonas aeruginosa", weight: 0.15 },
+            { name: "Acinetobacter baumannii", weight: 0.15 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Enterococcus spp.", weight: 0.1 },
+            { name: "Streptococcus pyogenes", weight: 0.05 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        tb: {
+          totalViruses: 0.05,
+          totalBacteria: 0.95,
+          bacteria: [
+            { name: "Mycobacterium tuberculosis", weight: 0.8 },
+            { name: "Staphylococcus aureus", weight: 0.1 },
+            { name: "Streptococcus pneumoniae", weight: 0.1 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        ecoli: {
+          totalViruses: 0.1,
+          totalBacteria: 0.9,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.4 },
+            { name: "Salmonella enterica", weight: 0.25 },
+            { name: "Campylobacter jejuni", weight: 0.2 },
+            { name: "Shigella spp.", weight: 0.15 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        pneumo: {
+          totalViruses: 0.25,
+          totalBacteria: 0.75,
+          bacteria: [
+            { name: "Streptococcus pneumoniae", weight: 0.6 },
+            { name: "Haemophilus influenzae", weight: 0.15 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Moraxella catarrhalis", weight: 0.1 },
+          ],
+          viruses: [
+            { name: "Influenza A", weight: 0.5 },
+            { name: "Virus respiratorio sincitial (RSV)", weight: 0.25 },
+            { name: "Rhinovirus", weight: 0.25 },
+          ],
+        },
+        lupus: {
+          totalViruses: 0.05,
+          totalBacteria: 0.95,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.3 },
+            { name: "Lactobacillus acidophilus", weight: 0.4 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Enterococcus spp.", weight: 0.15 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        ms: {
+          totalViruses: 0.05,
+          totalBacteria: 0.95,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.3 },
+            { name: "Lactobacillus acidophilus", weight: 0.4 },
+            { name: "Enterococcus spp.", weight: 0.15 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        tumor: {
+          totalViruses: 0.05,
+          totalBacteria: 0.95,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.3 },
+            { name: "Lactobacillus acidophilus", weight: 0.4 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Enterococcus spp.", weight: 0.15 },
+          ],
+          viruses: [
+            { name: "Rhinovirus", weight: 1.0 },
+          ],
+        },
+        immunodef: {
+          totalViruses: 0.2,
+          totalBacteria: 0.8,
+          bacteria: [
+            { name: "Escherichia coli", weight: 0.25 },
+            { name: "Klebsiella pneumoniae", weight: 0.15 },
+            { name: "Pseudomonas aeruginosa", weight: 0.15 },
+            { name: "Acinetobacter baumannii", weight: 0.1 },
+            { name: "Staphylococcus aureus", weight: 0.15 },
+            { name: "Enterococcus spp.", weight: 0.1 },
+            { name: "Salmonella enterica", weight: 0.1 },
+          ],
+          viruses: [
+            { name: "SARS-CoV-2", weight: 0.4 },
+            { name: "Influenza A", weight: 0.3 },
+            { name: "Virus respiratorio sincitial (RSV)", weight: 0.3 },
+          ],
+        },
+      };
+
+      const DISEASE_MICRO_DYN = JSON.parse(JSON.stringify(DISEASE_MICRO_BASE));
+
+      /* =========================
+         Entities & state
+         ========================= */
+      const immuneCells = [];
+      const microbes    = [];
+      const selfCells   = [];
+      let pickables     = [];
+      const attackBeams = [];
+      const attackBursts= [];
+
+      const NUM_IMMUNE   = 80;
+      const NUM_MICROBES = 480;
+      const NUM_SELF     = 45;
+
+      let diseaseProgress   = 0;
+      let currentDiseaseKey = "homeostasis";
+      let currentDiseaseKind= "healthy";
+
+      function createBeam(start, end, colorHex) {
+        const dir = new THREE.Vector3().subVectors(end, start);
+        const len = dir.length();
+        if (len < 0.01) return null;
+        const geom = new THREE.CylinderGeometry(0.22, 0.22, len, 10, 1, true);
+        const mat = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          transparent: true,
+          opacity: 0.9,
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        mesh.position.copy(mid);
+        mesh.quaternion.setFromUnitVectors(upVec, dir.clone().normalize());
+        scene.add(mesh);
+        return { mesh, ttl: 0.35 };
+      }
+
+      function createBurst(position, colorHex) {
+        const geom = new THREE.SphereGeometry(1.7, 22, 22);
+        const mat = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          transparent: true,
+          opacity: 0.95,
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.copy(position);
+        scene.add(mesh);
+        return { mesh, ttl: 0.55, baseScale: 1.7 };
+      }
+
+      function updateStatsUI() {
+        killedStatEl.textContent = stats.killed;
+        selfStatEl.textContent   = stats.selfDamaged;
+        activeStatEl.textContent = stats.activeLymph;
+        const aliveMicrobes = microbes.filter(m => m.alive).length;
+        microbeStatEl.textContent = aliveMicrobes;
+      }
+
+      function initImmuneAndSelf() {
+        for (let i = 0; i < NUM_IMMUNE; i++) {
+          const type = IMMUNE_TYPES[i % IMMUNE_TYPES.length];
+          const group = type.maker(type.color);
+          group.position.set(
+            rndBox(tissueSize * 0.45),
+            rndBox(tissueSize * 0.45),
+            rndBox(tissueSize * 0.45)
+          );
+          scene.add(group);
+
+          const cellObj = {
+            group,
+            type,
+            velocity: new THREE.Vector3(
+              (Math.random() - 0.5) * 1.3,
+              (Math.random() - 0.5) * 1.3,
+              (Math.random() - 0.5) * 1.3
+            ),
+            activation: 0,
+            lastDecision: null,
+          };
+
+          group.userData = {
+            entityKind: "immune",
+            label: type.label,
+            role: type.role,
+            activation: type.activation,
+            ref: cellObj,
+          };
+
+          immuneCells.push(cellObj);
+          pickables.push(group);
+        }
+
+        for (let i = 0; i < NUM_SELF; i++) {
+          const mesh = makeSelfCell();
+          mesh.position.set(
+            rndBox(tissueSize * 0.6),
+            rndBox(tissueSize * 0.6),
+            rndBox(tissueSize * 0.6)
+          );
+          scene.add(mesh);
+          const obj = {
+            mesh,
+            health: 1,
+            damaged: false,
+          };
+          mesh.userData = {
+            entityKind: "self",
+            label: "Célula de tejido (self)",
+            ref: obj,
+          };
+          selfCells.push(obj);
+          pickables.push(mesh);
+        }
+      }
+
+      function pickSpecByName(db, name) {
+        return db.find(s => s.name === name);
+      }
+
+      function classifyBacteriaType(spec) {
+        const gram = (spec.gram || "").toLowerCase();
+        const path = (spec.pathogenicity || "").toLowerCase();
+        if (path.includes("benefic") || path.includes("probiótico") || path.includes("probiotic")) {
+          return "probiotic";
+        }
+        if (gram.includes("positiv")) return "gramPos";
+        if (gram.includes("negativ")) return "gramNeg";
+        return "other";
+      }
+
+      function classifyVirusType(spec) {
+        const trop = (spec.tropism || "").toLowerCase();
+        if (trop.includes("respir")) return "resp";
+        return "other";
+      }
+
+      function spawnMicrobesForDisease(diseaseKey) {
+        const dist = DISEASE_MICRO_DYN[diseaseKey] || DISEASE_MICRO_DYN.homeostasis;
+        const totalViruses  = Math.round(NUM_MICROBES * dist.totalViruses);
+        const totalBacteria = NUM_MICROBES - totalViruses;
+
+        let clusterRadius;
+        switch (diseaseKey) {
+          case "tb":
+          case "tumor":
+            clusterRadius = tissueSize * 0.25;
+            break;
+          case "sepsis":
+          case "covid":
+            clusterRadius = tissueSize * 0.7;
+            break;
+          case "ecoli":
+          case "pneumo":
+          case "flu":
+            clusterRadius = tissueSize * 0.45;
+            break;
+          case "immunodef":
+            clusterRadius = tissueSize * 0.6;
+            break;
+          default:
+            clusterRadius = tissueSize * 0.9;
+        }
+
+        const center = new THREE.Vector3(
+          (Math.random() - 0.5) * tissueSize * 0.3,
+          (Math.random() - 0.5) * tissueSize * 0.3,
+          (Math.random() - 0.5) * tissueSize * 0.3
+        );
+
+        function allocate(list, total, isVirus) {
+          const db = isVirus ? VIRUS_DB : BACTERIA_DB;
+          let created = 0;
+
+          for (let i = 0; i < list.length; i++) {
+            const entry = list[i];
+            const spec = pickSpecByName(db, entry.name);
+            if (!spec) continue;
+            const remaining = total - created;
+            if (remaining <= 0) break;
+            const count = (i === list.length - 1) ? remaining : Math.round(entry.weight * total);
+            for (let k = 0; k < count && created < total; k++, created++) {
+              const group = isVirus ? makeVirusFromSpec(spec) : makeBacteriumFromSpec(spec);
+              const dir = new THREE.Vector3(
+                Math.random() - 0.5,
+                Math.random() - 0.5,
+                Math.random() - 0.5
+              ).normalize();
+              const r = Math.random() * clusterRadius;
+              group.position.copy(center).addScaledVector(dir, r);
+              group.rotation.set(
+                Math.random() * Math.PI,
+                Math.random() * Math.PI,
+                Math.random() * Math.PI
+              );
+              scene.add(group);
+
+              const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 2.0,
+                (Math.random() - 0.5) * 2.0,
+                (Math.random() - 0.5) * 2.0
+              );
+              const rotSpeed = new THREE.Vector3(
+                (Math.random() - 0.5) * 1.8,
+                (Math.random() - 0.5) * 1.8,
+                (Math.random() - 0.5) * 1.8
+              );
+
+              const isPathogen = !spec.pathogenicity.toLowerCase().includes("benefic");
+
+              const microObj = {
+                group,
+                typeCode: isVirus ? "virus" : "bacteria",
+                meta: spec,
+                isPathogen,
+                velocity,
+                rotSpeed,
+                alive: true,
+                stress: 0,
+              };
+
+              group.userData = {
+                entityKind: "microbe",
+                label: isVirus ? `Virus: ${spec.name}` : `Bacteria: ${spec.name}`,
+                subtype: isVirus ? "virus" : "bacteria",
+                ref: microObj,
+              };
+
+              microbes.push(microObj);
+              pickables.push(group);
+            }
+          }
+        }
+
+        allocate(dist.bacteria, totalBacteria, false);
+        allocate(dist.viruses,  totalViruses,  true);
+      }
+
+      function resetAndRespawnMicrobesForDisease(key) {
+        for (const m of microbes) {
+          if (m.group) scene.remove(m.group);
+        }
+        microbes.length = 0;
+        pickables = pickables.filter(obj => !(obj.userData && obj.userData.entityKind === "microbe"));
+        spawnMicrobesForDisease(key);
+        updateStatsUI();
+      }
+
+      function updateMicroTotalsLabel(key) {
+        const dist = DISEASE_MICRO_DYN[key] || DISEASE_MICRO_BASE[key];
+        if (!dist) {
+          microTotalBactEl.textContent = "–";
+          microTotalVirusEl.textContent = "–";
+          return;
+        }
+        let sumB = 0, sumV = 0;
+        dist.bacteria.forEach(e => sumB += e.weight || 0);
+        dist.viruses.forEach(e => sumV += e.weight || 0);
+        microTotalBactEl.textContent = sumB.toFixed(2);
+        microTotalVirusEl.textContent = sumV.toFixed(2);
+      }
+
+      function renderMicroPanelForDisease(key) {
+        const dist = DISEASE_MICRO_DYN[key] || DISEASE_MICRO_BASE[key];
+        if (!dist) return;
+
+        microHeaderEl.textContent = tr("microHeader");
+        microSubheaderEl.textContent = tr("microSubheader") + " " + i18n[currentLang].microHintChange;
+
+        microBodyEl.innerHTML = "";
+
+        const titleB = document.createElement("div");
+        titleB.className = "micro-section-title";
+        titleB.textContent = i18n[currentLang].microSectionBacteria;
+        microBodyEl.appendChild(titleB);
+
+        dist.bacteria.forEach(entry => {
+          const spec = pickSpecByName(BACTERIA_DB, entry.name) || { gram: "", pathogenicity: "" };
+          const typeCode = classifyBacteriaType(spec);
+
+          let typeLabel;
+          if (typeCode === "gramPos") typeLabel = i18n[currentLang].microTypeBacteriaGramPos;
+          else if (typeCode === "gramNeg") typeLabel = i18n[currentLang].microTypeBacteriaGramNeg;
+          else if (typeCode === "probiotic") typeLabel = i18n[currentLang].microTypeProbiotic;
+          else typeLabel = i18n[currentLang].microTypeBacteriaOther;
+
+          const row = document.createElement("div");
+          row.className = "micro-row";
+
+          const colInfo = document.createElement("div");
+          const nameSpan = document.createElement("div");
+          nameSpan.className = "micro-pathogen-name";
+          nameSpan.textContent = entry.name;
+          const typeSpan = document.createElement("div");
+          typeSpan.className = "micro-pathogen-type";
+          typeSpan.textContent = typeLabel;
+          colInfo.appendChild(nameSpan);
+          colInfo.appendChild(typeSpan);
+
+          const colControls = document.createElement("div");
+          colControls.className = "micro-controls";
+          const slider = document.createElement("input");
+          slider.type = "range";
+          slider.min = "0";
+          slider.max = "100";
+          slider.step = "1";
+          slider.value = String(Math.round((entry.weight || 0) * 100));
+          const num = document.createElement("input");
+          num.type = "number";
+          num.min = "0";
+          num.max = "100";
+          num.step = "1";
+          num.value = String(Math.round((entry.weight || 0) * 100));
+
+          function syncFromSlider() {
+            const v = parseFloat(slider.value);
+            num.value = v.toString();
+            entry.weight = v / 100;
+            updateMicroTotalsLabel(key);
+          }
+          function syncFromNumber() {
+            let v = parseFloat(num.value);
+            if (!Number.isFinite(v)) v = 0;
+            if (v < 0) v = 0;
+            if (v > 100) v = 100;
+            slider.value = v.toString();
+            entry.weight = v / 100;
+            updateMicroTotalsLabel(key);
+          }
+
+          slider.addEventListener("input", syncFromSlider);
+          num.addEventListener("change", syncFromNumber);
+
+          colControls.appendChild(slider);
+          colControls.appendChild(num);
+
+          row.appendChild(colInfo);
+          row.appendChild(colControls);
+          microBodyEl.appendChild(row);
+        });
+
+        const titleV = document.createElement("div");
+        titleV.className = "micro-section-title";
+        titleV.textContent = i18n[currentLang].microSectionViruses;
+        microBodyEl.appendChild(titleV);
+
+        dist.viruses.forEach(entry => {
+          const spec = pickSpecByName(VIRUS_DB, entry.name) || {};
+          const typeCode = classifyVirusType(spec);
+          let typeLabel;
+          if (typeCode === "resp") typeLabel = i18n[currentLang].microTypeVirusResp;
+          else typeLabel = i18n[currentLang].microTypeVirusOther;
+
+          const row = document.createElement("div");
+          row.className = "micro-row";
+
+          const colInfo = document.createElement("div");
+          const nameSpan = document.createElement("div");
+          nameSpan.className = "micro-pathogen-name";
+          nameSpan.textContent = entry.name;
+          const typeSpan = document.createElement("div");
+          typeSpan.className = "micro-pathogen-type";
+          typeSpan.textContent = typeLabel;
+          colInfo.appendChild(nameSpan);
+          colInfo.appendChild(typeSpan);
+
+          const colControls = document.createElement("div");
+          colControls.className = "micro-controls";
+          const slider = document.createElement("input");
+          slider.type = "range";
+          slider.min = "0";
+          slider.max = "100";
+          slider.step = "1";
+          slider.value = String(Math.round((entry.weight || 0) * 100));
+          const num = document.createElement("input");
+          num.type = "number";
+          num.min = "0";
+          num.max = "100";
+          num.step = "1";
+          num.value = String(Math.round((entry.weight || 0) * 100));
+
+          function syncFromSlider() {
+            const v = parseFloat(slider.value);
+            num.value = v.toString();
+            entry.weight = v / 100;
+            updateMicroTotalsLabel(key);
+          }
+          function syncFromNumber() {
+            let v = parseFloat(num.value);
+            if (!Number.isFinite(v)) v = 0;
+            if (v < 0) v = 0;
+            if (v > 100) v = 100;
+            slider.value = v.toString();
+            entry.weight = v / 100;
+            updateMicroTotalsLabel(key);
+          }
+
+          slider.addEventListener("input", syncFromSlider);
+          num.addEventListener("change", syncFromNumber);
+
+          colControls.appendChild(slider);
+          colControls.appendChild(num);
+
+          row.appendChild(colInfo);
+          row.appendChild(colControls);
+          microBodyEl.appendChild(row);
+        });
+
+        updateMicroTotalsLabel(key);
+      }
+
+      /* =========================
+         Raycaster & tooltip
+         ========================= */
+      const raycaster = new THREE.Raycaster();
+      const mouse     = new THREE.Vector2();
+
+      function showTooltip(x, y, data) {
+        if (!data) {
+          tooltip.style.display = "none";
+          return;
+        }
+        tooltip.style.display = "block";
+        tooltip.style.left = x + 12 + "px";
+        tooltip.style.top  = y + 12 + "px";
+
+        let html = "";
+
+        if (data.entityKind === "immune") {
+          const cell = data.ref;
+          html += `<strong>${data.label}</strong><br>`;
+          html += `<em>${data.role}</em><br>`;
+          html += `Activación biológica: ${data.activation}<br>`;
+          html += `Estado: ${cell.activation > 0.4 ? "ACTIVE / ACTIVO" : "vigilancia / surveillance"}<br>`;
+          if (cell.lastDecision) {
+            const d = cell.lastDecision;
+            const targetTxt =
+              d.targetType === "pathogen"
+                ? (d.attacked ? "ataque a patógeno (kill)" : "evaluando patógeno")
+                : (d.attacked ? "autoataque / daño a self" : "evaluando célula propia");
+            html += `Última decisión ECC: ${targetTxt}<br>`;
+            html += `Señal ≈ ${d.signal.toFixed(2)} · θ ≈ ${d.theta.toFixed(2)}<br>`;
+          }
+        } else if (data.entityKind === "microbe") {
+          const m = data.ref;
+          if (m.typeCode === "bacteria") {
+            const b = m.meta;
+            html += `<strong>Bacteria: ${b.name}</strong><br>`;
+            html += `${b.gram} · Forma: ${b.shape}<br>`;
+            html += `O₂: ${b.oxygen}<br>`;
+            html += `Nicho: ${b.niche}<br>`;
+            html += `Patogenicidad: ${b.pathogenicity}<br>`;
+            html += `Estado: ${m.alive ? (m.isPathogen ? "patógeno vivo" : "comensal vivo") : "eliminado"}<br>`;
+          } else {
+            const v = m.meta;
+            html += `<strong>Virus: ${v.name}</strong><br>`;
+            html += `${v.genome}<br>`;
+            html += `${v.envelope}<br>`;
+            html += `Tropismo: ${v.tropism}<br>`;
+            html += `Patogenicidad: ${v.pathogenicity}<br>`;
+            html += `Estado: ${m.alive ? "virus libre" : "neutralizado"}<br>`;
+          }
+        } else if (data.entityKind === "self") {
+          const s = data.ref;
+          html += `<strong>${data.label}</strong><br>`;
+          html += `Salud / Health: ${(s.health * 100).toFixed(0)} %<br>`;
+          html += `Dañada / Damaged: ${s.damaged ? "sí / yes" : "no"}<br>`;
+        }
+
+        if (externalDatasetMeta && currentDataSourceKey !== "synthetic") {
+          html += `<br><em>${i18n[currentLang].hintSeriesFrom(externalDatasetMeta.label)}</em>`;
+        }
+
+        tooltip.innerHTML = html;
+      }
+
+      function hideTooltip() {
+        tooltip.style.display = "none";
+      }
+
+      window.addEventListener("pointermove", (event) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(pickables, true);
+
+        if (intersects.length > 0) {
+          let obj = intersects[0].object;
+          while (obj && !obj.userData.entityKind && obj.parent) {
+            obj = obj.parent;
+          }
+          if (obj && obj.userData.entityKind) {
+            showTooltip(event.clientX, event.clientY, obj.userData);
+          } else {
+            hideTooltip();
+          }
+        } else {
+          hideTooltip();
+        }
+      });
+
+      /* =========================
+         Visual controls
+         ========================= */
+      function applyVisualControls() {
+        const bright = parseFloat(brightnessSlider.value);
+        const bgDark = parseFloat(bgDarkSlider.value);
+        const fogVal = parseFloat(fogSlider.value);
+
+        hemi.intensity    = baseLight.hemi * bright;
+        dirLight.intensity= baseLight.dir * bright;
+        ambient.intensity = baseLight.amb * bright;
+
+        const bgLevel = Math.round(bgDark * 60);
+        const bgColor = (bgLevel << 16) | (bgLevel << 8) | bgLevel;
+        renderer.setClearColor(bgColor, 1);
+
+        scene.fog.density = fogVal;
+      }
+      brightnessSlider.addEventListener("input", applyVisualControls);
+      bgDarkSlider.addEventListener("input", applyVisualControls);
+      fogSlider.addEventListener("input", applyVisualControls);
+      applyVisualControls();
+
+      let camRadius = 200;
+      const camRadiusMin = 80;
+      const camRadiusMax = 350;
+      window.addEventListener("wheel", (event) => {
+        const delta = event.deltaY;
+        const factor = Math.exp(delta * 0.001);
+        camRadius *= factor;
+        if (camRadius < camRadiusMin) camRadius = camRadiusMin;
+        if (camRadius > camRadiusMax) camRadius = camRadiusMax;
+      }, { passive: true });
+
+      /* =========================
+         ECC decision machinery
+         ========================= */
+      function lymphocyteDecision(dist, isPathogen, isSelfLike, dangerContext, theta) {
+        let affinity = Math.max(0, Math.min(1, 3.2 / Math.max(dist, 0.6)));
+        let signal = affinity;
+        if (dangerContext) signal += 0.35;
+        if (isSelfLike && Math.random() < ECC.autoimmuneBias) signal += 0.3;
+        signal += (Math.random() - 0.5) * 0.15;
+        signal = Math.max(0, Math.min(1.6, signal));
+        const activated = signal >= theta;
+        return { activated, signal, theta };
+      }
+
+      function getThetaFactorForCell(cellTypeKey, diseaseKind) {
+        switch (diseaseKind) {
+          case "viral":
+            if (cellTypeKey === "T_CD8" || cellTypeKey === "NK") return 0.9;
+            if (cellTypeKey === "DC") return 0.95;
+            if (cellTypeKey === "MAC") return 1.05;
+            return 1.0;
+          case "bacterial":
+            if (cellTypeKey === "MAC" || cellTypeKey === "B") return 0.9;
+            if (cellTypeKey === "T_CD8" || cellTypeKey === "NK") return 1.05;
+            return 1.0;
+          case "autoinmune":
+            if (cellTypeKey === "T_CD4" || cellTypeKey === "B") return 0.9;
+            return 1.0;
+          case "tumor":
+            if (cellTypeKey === "T_CD8" || cellTypeKey === "NK") return 0.9;
+            return 1.0;
+          case "immunodef":
+            return 1.1;
+          default:
+            return 1.0;
+        }
+      }
+
+      const clock = new THREE.Clock();
+
+      const scenarioBannerEl = scenarioBanner;
+
+      function showScenarioBanner(text) {
+        scenarioBannerEl.textContent = text;
+        scenarioBannerEl.style.display = "block";
+        void scenarioBannerEl.offsetWidth;
+        scenarioBannerEl.style.opacity = "1";
+        setTimeout(() => {
+          scenarioBannerEl.style.opacity = "0";
+        }, 1200);
+        setTimeout(() => {
+          scenarioBannerEl.style.display = "none";
+        }, 2000);
+      }
+
+      function applyDiseasePreset(key) {
+        const preset = DISEASE_PRESETS[key] || DISEASE_PRESETS.homeostasis;
+        const p = preset.params;
+
+        ECC.pathogenLoad        = p.pathogenLoad;
+        ECC.autoimmuneBias      = p.autoimmuneBias;
+        ECC.sensitivity         = p.sensitivity;
+        ECC.dangerBoostProb     = p.dangerBoostProb;
+        ECC.basePathogenLoad    = p.pathogenLoad;
+        ECC.baseAutoimmuneBias  = p.autoimmuneBias;
+        ECC.baseSensitivity     = p.sensitivity;
+        ECC.baseDangerBoostProb = p.dangerBoostProb;
+
+        currentDiseaseKey  = key;
+        currentDiseaseKind = preset.kind || "healthy";
+        diseaseProgress    = 0;
+
+        updateDiseaseInfoText();
+        renderMicroPanelForDisease(key);
+
+        stats.killed = 0;
+        stats.selfDamaged = 0;
+        resetAndRespawnMicrobesForDisease(key);
+
+        const dsExtra = (currentDataSourceKey !== "synthetic" && externalDatasetMeta)
+          ? externalDatasetMeta.label
+          : "";
+        const bannerText = i18n[currentLang].scenarioBanner(preset.labels[currentLang], dsExtra);
+        showScenarioBanner(bannerText);
+        appendLog(`—— ${bannerText} ——`);
+      }
+
+      diseaseSelect.addEventListener("change", () => {
+        applyDiseasePreset(diseaseSelect.value);
+      });
+
+      langSelect.addEventListener("change", () => {
+        currentLang = langSelect.value;
+        applyLanguage();
+      });
+
+      openTheory.addEventListener("click", () => {
+        theoryPanel.style.display = "flex";
+      });
+      closeTheory.addEventListener("click", () => {
+        theoryPanel.style.display = "none";
+      });
+
+      const microApplyBtnHandler = () => {
+        resetAndRespawnMicrobesForDisease(currentDiseaseKey);
+        appendLog(`Reaplicada mezcla de patógenos (escenario ${currentDiseaseKey}) con pesos modificados.`);
+      };
+      microApplyBtn.addEventListener("click", microApplyBtnHandler);
+
+      microResetBtn.addEventListener("click", () => {
+        DISEASE_MICRO_DYN[currentDiseaseKey] = JSON.parse(JSON.stringify(DISEASE_MICRO_BASE[currentDiseaseKey]));
+        renderMicroPanelForDisease(currentDiseaseKey);
+        resetAndRespawnMicrobesForDisease(currentDiseaseKey);
+        appendLog(`Reset de mezcla de patógenos al perfil epidemiológico base (${currentDiseaseKey}).`);
+      });
+
+      toggleSimBtn.addEventListener("click", () => {
+        simulationRunning = !simulationRunning;
+        toggleSimBtn.textContent = simulationRunning ? tr("togglePause") : tr("toggleResume");
+      });
+
+      window.addEventListener("keydown", (ev) => {
+        if (ev.code === "Space") {
+          ev.preventDefault();
+          simulationRunning = !simulationRunning;
+          toggleSimBtn.textContent = simulationRunning ? tr("togglePause") : tr("toggleResume");
+        }
+      });
+
+      function updateSimulation() {
+        const dt = clock.getDelta();
+        const simTime = clock.getElapsedTime();
+
+        camera.position.x = Math.cos(simTime * 0.12) * camRadius;
+        camera.position.z = Math.sin(simTime * 0.12) * camRadius;
+        camera.position.y = 70 + Math.sin(simTime * 0.5) * 15;
+        camera.lookAt(0, 0, 0);
+
+        const globalFlow = new THREE.Vector3(
+          Math.sin(simTime * 0.3) * 0.3,
+          Math.cos(simTime * 0.25) * 0.3,
+          Math.sin(simTime * 0.2) * 0.3
+        );
+
+        for (const p of cytokineParticles) {
+          p.phase += dt * p.speed;
+          const s = 1 + 0.3 * Math.sin(p.phase * 2);
+          p.mesh.scale.set(s, s, s);
+          p.mesh.material.opacity = p.baseOpacity * (0.6 + 0.4 * Math.sin(p.phase));
+          p.mesh.position.addScaledVector(globalFlow, dt * 0.5);
+        }
+
+        if (simulationRunning) {
+          diseaseProgress += dt * 0.02;
+          if (diseaseProgress > 1) diseaseProgress = 1;
+
+          let stageLabelText;
+          let stageThetaShift;
+          if (diseaseProgress < 0.3) {
+            stageLabelText   = i18n[currentLang].diseasePhaseEarly;
+            stageThetaShift  = 0.04;
+          } else if (diseaseProgress < 0.7) {
+            stageLabelText   = i18n[currentLang].diseasePhasePeak;
+            stageThetaShift  = -0.04;
+          } else {
+            stageLabelText   = i18n[currentLang].diseasePhaseLate;
+            stageThetaShift  = 0.02;
+          }
+
+          const clinical = sampleClinicalCurves(currentDiseaseKey, diseaseProgress);
+
+          ECC.pathogenLoad   = ECC.basePathogenLoad   * clinical.pathogenFactor;
+          ECC.autoimmuneBias = ECC.baseAutoimmuneBias + clinical.autoBiasDelta;
+
+          const dsTag = (currentDataSourceKey !== "synthetic" && externalDatasetMeta)
+            ? ` · dataset: ${externalDatasetMeta.label}`
+            : " · dataset: interno/internal ECC";
+
+          diseaseStageEl.innerHTML =
+            `<small>${stageLabelText} · ${(diseaseProgress*100).toFixed(0)} % · ` +
+            `pathogen ≈ ${clinical.pathogenFactor.toFixed(2)} · inflam. ≈ ${clinical.inflamFactor.toFixed(2)}${dsTag}</small>`;
+
+          const tempDelta = ENV.temperature - 37.0;
+          let tempImmuneBoost = 1.0;
+          let tempPathogenFactor = 1.0;
+          if (tempDelta > 0) {
+            const d = Math.min(tempDelta, 2);
+            tempImmuneBoost    = 1 + d * 0.08;
+            tempPathogenFactor = 1 - d * 0.06;
+          } else if (tempDelta < 0) {
+            const d = Math.min(-tempDelta, 2);
+            tempImmuneBoost    = 1 - d * 0.08;
+            tempPathogenFactor = 1 - d * 0.02;
+          }
+
+          const steroidFactor      = 1 - ENV.steroid * 0.8;
+          const thetaSteroidShift  = ENV.steroid * 0.15;
+
+          const dangerBoostBase = ECC.baseDangerBoostProb * clinical.inflamFactor;
+          const dangerBoostEff  = dangerBoostBase * steroidFactor;
+
+          const pathogenVelFactor  = tempPathogenFactor * (1 - ENV.antibiotic * 0.5);
+
+          for (const m of microbes) {
+            if (!m.alive) continue;
+
+            if (ENV.antibiotic > 0 && m.typeCode === "bacteria" && m.isPathogen) {
+              const killProb = ENV.antibiotic * 0.35 * dt;
+              if (Math.random() < killProb) {
+                m.alive = false;
+                stats.killed++;
+                attackBursts.push(createBurst(m.group.position, 0x38BDF8));
+                scene.remove(m.group);
+                continue;
+              }
+            }
+
+            let minDistImmune = Infinity;
+            for (const cell of immuneCells) {
+              const d = cell.group.position.distanceTo(m.group.position);
+              if (d < minDistImmune) minDistImmune = d;
+            }
+            m.stress = Math.max(0, 1 - minDistImmune / 30);
+            const fleeDir = m.group.position.clone().normalize();
+            m.velocity.addScaledVector(fleeDir, dt * m.stress * 2.0);
+
+            m.velocity.multiplyScalar(pathogenVelFactor);
+            m.group.position.addScaledVector(m.velocity, dt * 1.8);
+            m.group.rotation.x += m.rotSpeed.x * dt;
+            m.group.rotation.y += m.rotSpeed.y * dt;
+            m.group.rotation.z += m.rotSpeed.z * dt;
+
+            ["x", "y", "z"].forEach(axis => {
+              const half = tissueSize * 0.5;
+              if (m.group.position[axis] > half || m.group.position[axis] < -half) {
+                m.velocity[axis] *= -1;
+              }
+            });
+          }
+
+          for (const sCell of selfCells) {
+            const pulso = 1 + (sCell.damaged ? 0.3 : 0.0);
+            sCell.mesh.scale.set(pulso, pulso, pulso);
+          }
+
+          for (let i = attackBeams.length - 1; i >= 0; i--) {
+            const b = attackBeams[i];
+            b.ttl -= dt;
+            if (b.ttl <= 0) {
+              scene.remove(b.mesh);
+              attackBeams.splice(i, 1);
+            } else {
+              b.mesh.material.opacity = b.ttl / 0.35;
+            }
+          }
+          for (let i = attackBursts.length - 1; i >= 0; i--) {
+            const b = attackBursts[i];
+            b.ttl -= dt;
+            if (b.ttl <= 0) {
+              scene.remove(b.mesh);
+              attackBursts.splice(i, 1);
+            } else {
+              const life = 1 - b.ttl / 0.55;
+              const scale = b.baseScale * (1 + 2 * life);
+              b.mesh.scale.set(scale, scale, scale);
+              b.mesh.material.opacity = 0.95 * (1 - life);
+            }
+          }
+
+          stats.activeLymph = 0;
+
+          const detectionRadius = 24;
+          const killRadius      = 4.2;
+          const selfRadius      = 7.0;
+
+          for (const cell of immuneCells) {
+            const pos = cell.group.position;
+
+            pos.addScaledVector(cell.velocity, dt * 2.2 * tempImmuneBoost);
+            ["x", "y", "z"].forEach(axis => {
+              const half = tissueSize * 0.5;
+              if (pos[axis] > half || pos[axis] < -half) {
+                cell.velocity[axis] *= -1;
+              }
+            });
+            cell.velocity.x += (Math.random() - 0.5) * 0.14 * dt;
+            cell.velocity.y += (Math.random() - 0.5) * 0.14 * dt;
+            cell.velocity.z += (Math.random() - 0.5) * 0.14 * dt;
+
+            let active = false;
+            let lastDecision = null;
+
+            let nearestMicro = null;
+            let nearestMicroDist = detectionRadius;
+            for (const m of microbes) {
+              if (!m.alive) continue;
+              const d = pos.distanceTo(m.group.position);
+              if (d < nearestMicroDist) {
+                nearestMicroDist = d;
+                nearestMicro = m;
+              }
+            }
+
+            const focusesOnMicrobes = (cell.type.key !== "T_CD8" && cell.type.key !== "NK");
+            const thetaFactor = getThetaFactorForCell(cell.type.key, currentDiseaseKind);
+            const thetaImmune = (ECC.baseSensitivity + thetaSteroidShift + stageThetaShift) * thetaFactor / tempImmuneBoost;
+
+            if (nearestMicro && focusesOnMicrobes) {
+              const dir = tmpVec.copy(nearestMicro.group.position).sub(pos).normalize();
+              cell.velocity.addScaledVector(dir, dt * 8.0 * tempImmuneBoost);
+
+              const dangerContext =
+                nearestMicro.isPathogen || Math.random() < dangerBoostEff;
+
+              const decisionPath = lymphocyteDecision(
+                nearestMicroDist,
+                nearestMicro.isPathogen,
+                false,
+                dangerContext,
+                thetaImmune
+              );
+
+              if (decisionPath.activated) {
+                active = true;
+                let attacked = false;
+                if (nearestMicroDist < killRadius && nearestMicro.isPathogen && nearestMicro.alive) {
+                  nearestMicro.alive = false;
+                  stats.killed++;
+                  attacked = true;
+
+                  const beam = createBeam(pos, nearestMicro.group.position, cell.type.color);
+                  if (beam) attackBeams.push(beam);
+                  attackBursts.push(createBurst(nearestMicro.group.position, cell.type.color));
+
+                  scene.remove(nearestMicro.group);
+                }
+                lastDecision = {
+                  targetType: "pathogen",
+                  signal: decisionPath.signal,
+                  attacked,
+                  theta: decisionPath.theta,
+                };
+                if (attacked || Math.random() < 0.15) {
+                  appendLog(
+                    `${simTime.toFixed(1)} | ${cell.type.key} | pathogen | ` +
+                    `${decisionPath.signal.toFixed(2)} ≥ ${decisionPath.theta.toFixed(2)} | ` +
+                    (attacked ? "KILL" : "ACTIVE")
+                  );
+                }
+              }
+            }
+
+            for (const sCell of selfCells) {
+              const d2 = pos.distanceTo(sCell.mesh.position);
+              if (d2 < selfRadius) {
+                const hasDanger = Math.random() < (dangerBoostEff * 0.6);
+                const decisionSelf = lymphocyteDecision(
+                  d2,
+                  false,
+                  true,
+                  hasDanger,
+                  thetaImmune
+                );
+                if (decisionSelf.activated) {
+                  active = true;
+                  sCell.damaged = true;
+                  if (sCell.health > 0) {
+                    sCell.health -= 0.012;
+                    if (sCell.health <= 0) {
+                      stats.selfDamaged++;
+                    }
+                  }
+                  sCell.mesh.material.emissiveIntensity = 0.9 + Math.random() * 1.0;
+                  sCell.mesh.material.opacity = 0.7 - (1 - sCell.health) * 0.3;
+
+                  const beam = createBeam(pos, sCell.mesh.position, cell.type.color);
+                  if (beam) attackBeams.push(beam);
+                  attackBursts.push(createBurst(sCell.mesh.position, 0xFB923C));
+
+                  lastDecision = {
+                    targetType: "self",
+                    signal: decisionSelf.signal,
+                    attacked: true,
+                    theta: decisionSelf.theta,
+                  };
+                  appendLog(
+                    `${simTime.toFixed(1)} | ${cell.type.key} | SELF | ` +
+                    `${decisionSelf.signal.toFixed(2)} ≥ ${decisionSelf.theta.toFixed(2)} | AUTOATTACK`
+                  );
+                }
+              }
+            }
+
+            if (lastDecision) cell.lastDecision = lastDecision;
+
+            cell.activation += (active ? 1 : -1) * 0.18;
+            cell.activation = Math.max(0, Math.min(1, cell.activation));
+            const emissiveIntensity = (0.4 + cell.activation * 1.4);
+            const scalePulse = 1 + cell.activation * 0.35;
+            cell.group.traverse(obj => {
+              if (obj.isMesh && obj.material && obj.material.emissive !== undefined) {
+                obj.material.emissiveIntensity = emissiveIntensity;
+              }
+            });
+            cell.group.scale.set(scalePulse, scalePulse, scalePulse);
+
+            if (active) stats.activeLymph++;
+          }
+
+          updateStatsUI();
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        updateSimulation();
+      }
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // INIT
+      initImmuneAndSelf();
+      applyDiseasePreset("homeostasis");
+      diseaseSelect.value = "homeostasis";
+      datasetStatusEl.textContent = tr("datasetStatusSynthetic");
+      applyLanguage();
+      renderMicroPanelForDisease("homeostasis");
+      animate();
+    });
+  </script>
+</body>
+</html>
